@@ -27,6 +27,8 @@ export interface ConfidentialPayrollInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "addEmployee"
+      | "closePayroll"
+      | "closed"
       | "confidentialProtocolId"
       | "employer"
       | "fundPayroll"
@@ -46,6 +48,7 @@ export interface ConfidentialPayrollInterface extends Interface {
     nameOrSignatureOrTopic:
       | "EmployeeAdded"
       | "EmployeeRemoved"
+      | "PayrollClosed"
       | "PayrollFunded"
       | "PayrollWithdrawn"
       | "SalaryPaid"
@@ -56,6 +59,11 @@ export interface ConfidentialPayrollInterface extends Interface {
     functionFragment: "addEmployee",
     values: [AddressLike, BigNumberish, BytesLike, BytesLike]
   ): string;
+  encodeFunctionData(
+    functionFragment: "closePayroll",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "closed", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "confidentialProtocolId",
     values?: undefined
@@ -107,6 +115,11 @@ export interface ConfidentialPayrollInterface extends Interface {
     functionFragment: "addEmployee",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "closePayroll",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "closed", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "confidentialProtocolId",
     data: BytesLike
@@ -169,6 +182,19 @@ export namespace EmployeeRemovedEvent {
   export type OutputTuple = [employee: string];
   export interface OutputObject {
     employee: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace PayrollClosedEvent {
+  export type InputTuple = [employer: AddressLike, refunded: BigNumberish];
+  export type OutputTuple = [employer: string, refunded: bigint];
+  export interface OutputObject {
+    employer: string;
+    refunded: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -290,6 +316,10 @@ export interface ConfidentialPayroll extends BaseContract {
     "nonpayable"
   >;
 
+  closePayroll: TypedContractMethod<[], [void], "nonpayable">;
+
+  closed: TypedContractMethod<[], [boolean], "view">;
+
   confidentialProtocolId: TypedContractMethod<[], [bigint], "view">;
 
   employer: TypedContractMethod<[], [string], "view">;
@@ -358,6 +388,12 @@ export interface ConfidentialPayroll extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "closePayroll"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "closed"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
     nameOrSignature: "confidentialProtocolId"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -425,6 +461,13 @@ export interface ConfidentialPayroll extends BaseContract {
     EmployeeRemovedEvent.OutputObject
   >;
   getEvent(
+    key: "PayrollClosed"
+  ): TypedContractEvent<
+    PayrollClosedEvent.InputTuple,
+    PayrollClosedEvent.OutputTuple,
+    PayrollClosedEvent.OutputObject
+  >;
+  getEvent(
     key: "PayrollFunded"
   ): TypedContractEvent<
     PayrollFundedEvent.InputTuple,
@@ -474,6 +517,17 @@ export interface ConfidentialPayroll extends BaseContract {
       EmployeeRemovedEvent.InputTuple,
       EmployeeRemovedEvent.OutputTuple,
       EmployeeRemovedEvent.OutputObject
+    >;
+
+    "PayrollClosed(address,uint256)": TypedContractEvent<
+      PayrollClosedEvent.InputTuple,
+      PayrollClosedEvent.OutputTuple,
+      PayrollClosedEvent.OutputObject
+    >;
+    PayrollClosed: TypedContractEvent<
+      PayrollClosedEvent.InputTuple,
+      PayrollClosedEvent.OutputTuple,
+      PayrollClosedEvent.OutputObject
     >;
 
     "PayrollFunded(address,uint256)": TypedContractEvent<

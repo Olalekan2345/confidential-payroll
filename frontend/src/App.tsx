@@ -51,6 +51,8 @@ export default function App() {
   const [setupPhase,     setSetupPhase]     = useState<"checking" | "setup" | "ready">("checking");
   const [contractInput,  setContractInput]  = useState("");
   const [deploying,      setDeploying]      = useState(false);
+  const [contractClosed, setContractClosed] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   // Role view — employers can toggle to see the employee panel
   const [viewAs, setViewAs] = useState<"employer" | "employee">("employer");
@@ -240,8 +242,12 @@ export default function App() {
 
   const loadEmployerAddr = async () => {
     try {
-      const addr = await contract().employer();
+      const [addr, isClosed] = await Promise.all([
+        contract().employer(),
+        contract().closed(),
+      ]);
       setEmployerAddr(addr as string);
+      setContractClosed(isClosed as boolean);
     } catch { /* ignore */ }
   };
 
@@ -290,6 +296,38 @@ export default function App() {
       await tx.wait();
       setWithdrawAmt("");
     });
+
+  const handleClosePayroll = async () => {
+    setBusy(true);
+    setStatus(null);
+    setShowCloseConfirm(false);
+    try {
+      const tx = await contract(true).closePayroll();
+      await tx.wait();
+      setContractClosed(true);
+      setContractBalance("0");
+      ok("Payroll closed. All remaining ETH has been refunded to your wallet.");
+      await loadBalances();
+    } catch (e: unknown) {
+      fail(e instanceof Error ? e.message : "Close payroll failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Fully disconnect this wallet from the app (client-side only)
+  const handleLogout = () => {
+    setPayrollAddress("");
+    setSetupPhase("setup");
+    setEmployerAddr("");
+    setEmployees([]);
+    setContractBalance(null);
+    setWalletBalance(null);
+    setStatus(null);
+    setContractClosed(false);
+    setShowCloseConfirm(false);
+    setViewAs("employer");
+  };
 
   const handleAddEmployee = () =>
     wrap("Add employee", async () => {
@@ -500,6 +538,16 @@ export default function App() {
                   {viewAs === "employer" ? "View as Employee" : "View as Employer"}
                 </button>
               )}
+              {setupPhase === "ready" && (
+                <button
+                  className="btn-danger btn-sm"
+                  onClick={handleLogout}
+                  style={{ fontSize: 11, padding: "4px 10px" }}
+                  title="Disconnect from this payroll"
+                >
+                  Disconnect
+                </button>
+              )}
             </div>
           ) : (
             <button className="btn-primary" onClick={fhevm.connect} disabled={fhevm.loading}>
@@ -600,6 +648,20 @@ export default function App() {
         ) : (
           /* Ready — full app */
           <>
+            {/* ── Closed contract banner ── */}
+            {contractClosed && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                background: "var(--danger-dim)",
+                border: "1px solid rgba(248,113,113,0.25)",
+                borderRadius: "var(--radius-sm)", padding: "11px 16px", marginBottom: 24,
+                fontSize: 13, color: "var(--danger)",
+              }}>
+                <span>✕</span>
+                This payroll contract has been permanently closed. No further actions are possible.
+              </div>
+            )}
+
             {/* ── Status banner ── */}
             {status && (
               <div style={{
@@ -686,17 +748,47 @@ export default function App() {
                           <label>Deposit ETH{fundAmount && toUsd(fundAmount) ? ` · ${toUsd(fundAmount)}` : ""}</label>
                           <input type="number" placeholder="0.05" value={fundAmount} onChange={e => setFundAmount(e.target.value)} />
                         </div>
-                        <button className="btn-primary btn-sm" onClick={handleFund} disabled={busy || !fundAmount} style={{ marginBottom: 1 }}>
+                        <button className="btn-primary btn-sm" onClick={handleFund} disabled={busy || !fundAmount || contractClosed} style={{ marginBottom: 1 }}>
                           Deposit
                         </button>
                         <div>
                           <label>Withdraw ETH{withdrawAmt && toUsd(withdrawAmt) ? ` · ${toUsd(withdrawAmt)}` : ""}</label>
                           <input type="number" placeholder="0.01" value={withdrawAmt} onChange={e => setWithdrawAmt(e.target.value)} />
                         </div>
-                        <button className="btn-ghost btn-sm" onClick={handleWithdraw} disabled={busy || !withdrawAmt} style={{ marginBottom: 1 }}>
+                        <button className="btn-ghost btn-sm" onClick={handleWithdraw} disabled={busy || !withdrawAmt || contractClosed} style={{ marginBottom: 1 }}>
                           Withdraw
                         </button>
                       </div>
+
+                      {/* Close Payroll */}
+                      <hr className="divider" />
+                      {!showCloseConfirm ? (
+                        <button
+                          className="btn-danger btn-sm"
+                          onClick={() => setShowCloseConfirm(true)}
+                          disabled={busy || contractClosed}
+                          style={{ fontSize: 12 }}
+                        >
+                          {contractClosed ? "Payroll Closed" : "Close & Delete Payroll"}
+                        </button>
+                      ) : (
+                        <div style={{ background: "var(--danger-dim)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+                          <p style={{ fontSize: 13, color: "var(--danger)", marginBottom: 12, fontWeight: 600 }}>
+                            Are you sure? This permanently closes the payroll.
+                          </p>
+                          <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 14, lineHeight: 1.6 }}>
+                            All remaining ETH will be refunded to your wallet. No further deposits, payments, or employee changes will be possible.
+                          </p>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn-danger btn-sm" onClick={handleClosePayroll} disabled={busy}>
+                              Yes, Close Permanently
+                            </button>
+                            <button className="btn-ghost btn-sm" onClick={() => setShowCloseConfirm(false)} disabled={busy}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Add Employee */}
@@ -711,7 +803,7 @@ export default function App() {
                           <label>Monthly salary (ETH){newSalary && toUsd(newSalary) ? ` · ${toUsd(newSalary)}` : ""}</label>
                           <input type="number" placeholder="0.01" value={newSalary} onChange={e => setNewSalary(e.target.value)} />
                         </div>
-                        <button className="btn-primary" onClick={handleAddEmployee} disabled={busy || !newEmployee || !newSalary} style={{ justifyContent: "center", marginTop: 4 }}>
+                        <button className="btn-primary" onClick={handleAddEmployee} disabled={busy || !newEmployee || !newSalary || contractClosed} style={{ justifyContent: "center", marginTop: 4 }}>
                           Add Employee
                         </button>
                       </div>
@@ -732,7 +824,7 @@ export default function App() {
                           <label>New salary (ETH){updateSalary && toUsd(updateSalary) ? ` · ${toUsd(updateSalary)}` : ""}</label>
                           <input type="number" placeholder="0.01" value={updateSalary} onChange={e => setUpdateSalary(e.target.value)} />
                         </div>
-                        <button className="btn-ghost" onClick={handleUpdateSalary} disabled={busy || !updateTarget || !updateSalary} style={{ justifyContent: "center", marginTop: 4 }}>
+                        <button className="btn-ghost" onClick={handleUpdateSalary} disabled={busy || !updateTarget || !updateSalary || contractClosed} style={{ justifyContent: "center", marginTop: 4 }}>
                           Update Salary
                         </button>
                       </div>
@@ -751,10 +843,10 @@ export default function App() {
                     </div>
                     {showEmployerView && (
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn-ghost btn-sm" onClick={handlePaySelected} disabled={busy || selectedEmployees.size === 0}>
+                        <button className="btn-ghost btn-sm" onClick={handlePaySelected} disabled={busy || selectedEmployees.size === 0 || contractClosed}>
                           Pay Selected ({selectedEmployees.size})
                         </button>
-                        <button className="btn-primary btn-sm" onClick={handlePayAll} disabled={busy || activeCount === 0}>
+                        <button className="btn-primary btn-sm" onClick={handlePayAll} disabled={busy || activeCount === 0 || contractClosed}>
                           Pay All ({activeCount})
                         </button>
                       </div>
@@ -851,8 +943,8 @@ export default function App() {
                             {showEmployerView && (
                               emp.active ? (
                                 <div style={{ display: "flex", gap: 6 }}>
-                                  <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy}>Pay</button>
-                                  <button className="btn-danger btn-sm" onClick={() => handleRemove(emp.address)} disabled={busy}>Remove</button>
+                                  <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy || contractClosed}>Pay</button>
+                                  <button className="btn-danger btn-sm" onClick={() => handleRemove(emp.address)} disabled={busy || contractClosed}>Remove</button>
                                 </div>
                               ) : <div />
                             )}

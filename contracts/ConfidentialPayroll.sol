@@ -22,9 +22,15 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
     // ─── Roles ────────────────────────────────────────────────────────────────
 
     address public employer;
+    bool    public closed;
 
     modifier onlyEmployer() {
         require(msg.sender == employer, "ConfidentialPayroll: not employer");
+        _;
+    }
+
+    modifier notClosed() {
+        require(!closed, "ConfidentialPayroll: payroll is closed");
         _;
     }
 
@@ -49,6 +55,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
     event PayrollFunded(address indexed funder, uint256 amount);
     event SalaryPaid(address indexed employee, uint256 amount, uint256 timestamp);
     event PayrollWithdrawn(address indexed employer, uint256 amount);
+    event PayrollClosed(address indexed employer, uint256 refunded);
 
     // ─── Constructor ──────────────────────────────────────────────────────────
 
@@ -59,7 +66,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
 
     // ─── Fund ─────────────────────────────────────────────────────────────────
 
-    function fundPayroll() external payable onlyEmployer {
+    function fundPayroll() external payable onlyEmployer notClosed {
         require(msg.value > 0, "ConfidentialPayroll: zero deposit");
         emit PayrollFunded(msg.sender, msg.value);
     }
@@ -77,7 +84,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
         uint256 salaryWei,
         externalEuint64 encSalary,
         bytes calldata inputProof
-    ) external onlyEmployer {
+    ) external onlyEmployer notClosed {
         require(employee != address(0), "ConfidentialPayroll: zero address");
         require(!_employees[employee].active, "ConfidentialPayroll: already registered");
         require(salaryWei > 0, "ConfidentialPayroll: zero salary");
@@ -109,7 +116,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
         uint256 newSalaryWei,
         externalEuint64 encNewSalary,
         bytes calldata inputProof
-    ) external onlyEmployer {
+    ) external onlyEmployer notClosed {
         require(_employees[employee].active, "ConfidentialPayroll: not registered");
         require(newSalaryWei > 0, "ConfidentialPayroll: zero salary");
 
@@ -125,7 +132,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
         emit SalaryUpdated(employee);
     }
 
-    function removeEmployee(address employee) external onlyEmployer {
+    function removeEmployee(address employee) external onlyEmployer notClosed {
         require(_employees[employee].active, "ConfidentialPayroll: not registered");
         _employees[employee].active = false;
         emit EmployeeRemoved(employee);
@@ -141,7 +148,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
      * What stays private is the salary RATE stored in encrypted contract state —
      * nobody can query `_employees[addr].salary` and read the number.
      */
-    function paySalary(address employee) public onlyEmployer {
+    function paySalary(address employee) public onlyEmployer notClosed {
         Employee storage emp = _employees[employee];
         require(emp.active, "ConfidentialPayroll: not registered");
         require(address(this).balance >= emp.salaryWei, "ConfidentialPayroll: insufficient pool");
@@ -201,7 +208,23 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
 
     // ─── Employer: withdraw surplus ───────────────────────────────────────────
 
-    function withdrawSurplus(uint256 amount) external onlyEmployer {
+    // ─── Close payroll ────────────────────────────────────────────────────────
+
+    /**
+     * @notice Permanently close this payroll. Refunds all remaining ETH to the
+     *         employer and marks the contract as closed — all further actions revert.
+     *         This cannot be undone.
+     */
+    function closePayroll() external onlyEmployer notClosed {
+        closed = true;
+        uint256 bal = address(this).balance;
+        if (bal > 0) {
+            payable(employer).transfer(bal);
+        }
+        emit PayrollClosed(employer, bal);
+    }
+
+    function withdrawSurplus(uint256 amount) external onlyEmployer notClosed {
         require(address(this).balance >= amount, "ConfidentialPayroll: insufficient ETH");
         payable(employer).transfer(amount);
         emit PayrollWithdrawn(employer, amount);

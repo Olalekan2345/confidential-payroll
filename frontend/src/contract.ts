@@ -2,7 +2,7 @@
 // One global deployment. Anyone calls create() to deploy their own payroll.
 // Replace FACTORY_ADDRESS with the deployed address after running:
 //   npx hardhat deploy --tags ConfidentialPayrollFactory --network sepolia
-export const FACTORY_ADDRESS = "0x33947157b0124E4A7a0eaB141fC377e2f593d0A7";
+export const FACTORY_ADDRESS = "0xD9AB1aAE8Ca9C1a5023205242FD56583a0E9bbf0";
 
 export const FACTORY_ABI = [
   "function create() returns (address)",
@@ -16,9 +16,11 @@ export const FACTORY_ABI = [
 export const PAYROLL_ABI = [
   // State
   "function employer() view returns (address)",
+  "function closed() view returns (bool)",
 
   // Employer actions
   "function fundPayroll() payable",
+  "function closePayroll()",
   "function addEmployee(address employee, uint256 salaryWei, bytes32 encSalary, bytes calldata inputProof)",
   "function updateSalary(address employee, uint256 newSalaryWei, bytes32 encNewSalary, bytes calldata inputProof)",
   "function removeEmployee(address employee)",
@@ -44,4 +46,5 @@ export const PAYROLL_ABI = [
   "event PayrollFunded(address indexed funder, uint256 amount)",
   "event SalaryPaid(address indexed employee, uint256 amount, uint256 timestamp)",
   "event PayrollWithdrawn(address indexed employer, uint256 amount)",
+  "event PayrollClosed(address indexed employer, uint256 refunded)",
 ] as const;
