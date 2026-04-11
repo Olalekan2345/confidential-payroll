@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BrowserProvider, ethers } from "ethers";
 import { initSDK, createInstance, SepoliaConfig, type FhevmInstance } from "@zama-fhe/relayer-sdk/web";
 
-// Module-level cache — one instance per page load
+const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111
+
+// Module-level cache — one instance per page load, per chain
 let cachedInstance: FhevmInstance | null = null;
 let sdkInitialized = false;
 
@@ -18,6 +20,37 @@ async function ensureSDK() {
     console.warn("initSDK failed, retrying without explicit paths:", e);
     await initSDK();
     sdkInitialized = true;
+  }
+}
+
+// Switches MetaMask to Sepolia. Throws a user-friendly error if the user rejects.
+async function switchToSepolia() {
+  if (!window.ethereum) throw new Error("MetaMask not found — please install it.");
+  const chainId = await window.ethereum.request({ method: "eth_chainId" }) as string;
+  if (chainId === SEPOLIA_CHAIN_ID) return; // already on Sepolia
+
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: SEPOLIA_CHAIN_ID }],
+    });
+  } catch (switchError: unknown) {
+    // Error code 4902 = chain not added to MetaMask yet
+    const code = (switchError as { code?: number })?.code;
+    if (code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: SEPOLIA_CHAIN_ID,
+          chainName: "Sepolia Testnet",
+          nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+          rpcUrls: ["https://rpc.sepolia.org"],
+          blockExplorerUrls: ["https://sepolia.etherscan.io"],
+        }],
+      });
+    } else {
+      throw new Error("Please switch MetaMask to the Sepolia testnet to use this app.");
+    }
   }
 }
 
@@ -67,6 +100,9 @@ export function useFhevm(employerAddress: string): FhevmState {
 
     try {
       if (!window.ethereum) throw new Error("MetaMask not found — please install it.");
+
+      // Ensure user is on Sepolia before anything else
+      await switchToSepolia();
 
       const _provider = new BrowserProvider(window.ethereum);
       await _provider.send("eth_requestAccounts", []);
@@ -122,6 +158,17 @@ export function useFhevm(employerAddress: string): FhevmState {
     window.ethereum?.on("accountsChanged", handler);
     return () => window.ethereum?.removeListener("accountsChanged", handler);
   }, []);
+
+  // When the user switches chains, clear the cached instance and re-connect
+  useEffect(() => {
+    const handler = () => {
+      cachedInstance = null;
+      setInstance(null);
+      connect();
+    };
+    window.ethereum?.on("chainChanged", handler);
+    return () => window.ethereum?.removeListener("chainChanged", handler);
+  }, [connect]);
 
   return {
     provider,
