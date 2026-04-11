@@ -637,9 +637,10 @@ export default function App() {
                   placeholder="0x… employer's payroll contract"
                   value={contractInput}
                   onChange={e => setContractInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && contractInput && handleConnectContract()}
                   style={{ flex: 1 }}
                 />
-                <button className="btn-ghost" onClick={handleConnectContract} disabled={!contractInput} style={{ whiteSpace: "nowrap" }}>
+                <button className="btn-ghost" onClick={() => handleConnectContract()} disabled={!contractInput} style={{ whiteSpace: "nowrap" }}>
                   Connect
                 </button>
               </div>
