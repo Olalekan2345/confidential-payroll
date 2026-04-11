@@ -212,8 +212,8 @@ export default function App() {
     }
   };
 
-  const handleConnectContract = () => {
-    const addr = contractInput.trim();
+  const handleConnectContract = (addrOverride?: string) => {
+    const addr = (addrOverride ?? contractInput).trim();
     if (!ethers.isAddress(addr)) {
       setStatus({ text: "Invalid address — please enter a valid 0x… address", ok: false });
       return;
@@ -221,6 +221,22 @@ export default function App() {
     setPayrollAddress(addr);
     setSetupPhase("ready");
   };
+
+  // Auto-fill contract address from ?payroll= URL param (shareable employee link)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("payroll");
+    if (p && ethers.isAddress(p)) setContractInput(p);
+  }, []);
+
+  // Once wallet is connected + setup screen shown, auto-connect if URL had a valid payroll param
+  useEffect(() => {
+    if (setupPhase !== "setup") return;
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("payroll");
+    if (p && ethers.isAddress(p)) handleConnectContract(p);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setupPhase]);
 
   const loadEmployerAddr = async () => {
     try {
@@ -359,10 +375,30 @@ export default function App() {
     return Object.values(results)[0] as bigint;
   };
 
+  // Confirm the connected wallet is an active employee before attempting decrypt.
+  // Returns true if registered, false + sets error if not.
+  const assertEmployeeRegistered = async (): Promise<boolean> => {
+    try {
+      const [active] = await contract().getEmployeeInfo(fhevm.address);
+      if (!active) {
+        fail(
+          "Your wallet is not registered on this payroll contract. " +
+          "Make sure you are using the correct contract address and that your employer has added you."
+        );
+        return false;
+      }
+      return true;
+    } catch {
+      fail("Could not verify your registration status. Check the contract address and try again.");
+      return false;
+    }
+  };
+
   const handleDecryptMySalary = async () => {
     if (!fhevm.instance) return fail("FHEVM instance not ready");
     setBusy(true); setStatus(null);
     try {
+      if (!await assertEmployeeRegistered()) return;
       const handle = await contract(true).getMySalary();
       const val = await userDecryptHandle(handle);
       const ethAmt1 = ethers.formatEther(val);
@@ -378,6 +414,7 @@ export default function App() {
     if (!fhevm.instance) return fail("FHEVM instance not ready");
     setBusy(true); setStatus(null);
     try {
+      if (!await assertEmployeeRegistered()) return;
       const handle = await contract(true).getMyTotalPaid();
       const val = await userDecryptHandle(handle);
       const ethAmt2 = ethers.formatEther(val);
@@ -973,6 +1010,20 @@ export default function App() {
             <span>Contract: <code>{short(payrollAddress)}</code></span>
             <span>·</span>
             <a href={`https://sepolia.etherscan.io/address/${payrollAddress}`} target="_blank" rel="noreferrer">View on Etherscan ↗</a>
+            <span>·</span>
+            {showEmployerView && (
+              <button
+                className="btn-ghost btn-sm"
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}?payroll=${payrollAddress}`;
+                  navigator.clipboard.writeText(url);
+                  ok("Employee link copied to clipboard!");
+                }}
+                style={{ fontSize: 11, padding: "3px 10px" }}
+              >
+                Copy Employee Link
+              </button>
+            )}
             <span>·</span>
           </>}
           <span>Powered by <a href="https://zama.ai" target="_blank" rel="noreferrer">Zama FHEVM</a></span>
