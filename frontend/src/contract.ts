@@ -1,6 +1,19 @@
-export const CONTRACT_ADDRESS = "0x69524c0a6eB59558F5A85ff9b87D9532B5B9EeB0";
+// ─── Factory ──────────────────────────────────────────────────────────────────
+// One global deployment. Anyone calls create() to deploy their own payroll.
+// Replace FACTORY_ADDRESS with the deployed address after running:
+//   npx hardhat deploy --tags ConfidentialPayrollFactory --network sepolia
+export const FACTORY_ADDRESS = "0x33947157b0124E4A7a0eaB141fC377e2f593d0A7";
 
-export const ABI = [
+export const FACTORY_ABI = [
+  "function create() returns (address)",
+  "function userPayroll(address user) view returns (address)",
+  "function totalPayrolls() view returns (uint256)",
+  "event PayrollCreated(address indexed employer, address indexed payroll)",
+] as const;
+
+// ─── Per-employer Payroll ─────────────────────────────────────────────────────
+// Deployed via factory — address is different per user.
+export const PAYROLL_ABI = [
   // State
   "function employer() view returns (address)",
 

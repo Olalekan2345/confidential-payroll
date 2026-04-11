@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Contract, ethers } from "ethers";
-import { ABI, CONTRACT_ADDRESS } from "./contract";
+import { FACTORY_ADDRESS, FACTORY_ABI, PAYROLL_ABI } from "./contract";
 import { useFhevm } from "./useFhevm";
 import { TxHistory } from "./TxHistory";
 
@@ -46,6 +46,12 @@ export default function App() {
   const [employerAddr, setEmployerAddr] = useState("");
   const fhevm = useFhevm(employerAddr);
 
+  // Factory flow
+  const [payrollAddress, setPayrollAddress] = useState("");
+  const [setupPhase,     setSetupPhase]     = useState<"checking" | "setup" | "ready">("checking");
+  const [contractInput,  setContractInput]  = useState("");
+  const [deploying,      setDeploying]      = useState(false);
+
   const [employees,         setEmployees]         = useState<EmployeeRow[]>([]);
   const [status,            setStatus]            = useState<StatusMsg | null>(null);
   const [busy,              setBusy]              = useState(false);
@@ -79,9 +85,15 @@ export default function App() {
   const ok   = (text: string) => setStatus({ text, ok: true });
   const fail = (text: string) => setStatus({ text, ok: false });
 
+  const factory = () => {
+    if (!fhevm.provider) throw new Error("Not connected");
+    return new Contract(FACTORY_ADDRESS, FACTORY_ABI, fhevm.provider);
+  };
+
   const contract = (write = false) => {
     if (!fhevm.signer || !fhevm.provider) throw new Error("Not connected");
-    return new Contract(CONTRACT_ADDRESS, ABI, write ? fhevm.signer : fhevm.provider);
+    if (!payrollAddress) throw new Error("No payroll contract selected");
+    return new Contract(payrollAddress, PAYROLL_ABI, write ? fhevm.signer : fhevm.provider);
   };
 
   // ─── ETH price ────────────────────────────────────────────────────────────
@@ -110,9 +122,14 @@ export default function App() {
     return `$${(n * ethPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
+  // ─── Factory check ─────────────────────────────────────────────────────────
 
+  // When wallet connects, look up whether this address already has a deployed
+  // payroll via the factory. If yes → go straight to the app. If no → setup.
   useEffect(() => {
+    if (!fhevm.address || !fhevm.provider) return;
+    setSetupPhase("checking");
+    setPayrollAddress("");
     setEmployees([]);
     setWalletBalance(null);
     setContractBalance(null);
@@ -120,23 +137,85 @@ export default function App() {
     setMyTotalPaidDecrypted(null);
     setShowSalary(false);
     setShowTotalPaid(false);
-    if (fhevm.address) {
-      loadEmployerAddr();
-      loadEmployees();
-      loadBalances();
-    }
+
+    (async () => {
+      try {
+        const addr = await factory().userPayroll(fhevm.address) as string;
+        if (addr && addr !== ethers.ZeroAddress) {
+          setPayrollAddress(addr);
+          setSetupPhase("ready");
+        } else {
+          setSetupPhase("setup");
+        }
+      } catch {
+        setSetupPhase("setup");
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fhevm.address]);
 
+  // When a payroll address is set (after deploy or manual entry), load data
+  useEffect(() => {
+    if (!payrollAddress) return;
+    loadEmployerAddr();
+    loadEmployees();
+    loadBalances();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payrollAddress]);
+
   const loadBalances = async () => {
-    if (!fhevm.provider || !fhevm.address) return;
+    if (!fhevm.provider || !fhevm.address || !payrollAddress) return;
     try {
       const [wWei, cWei] = await Promise.all([
         fhevm.provider.getBalance(fhevm.address),
-        fhevm.provider.getBalance(CONTRACT_ADDRESS),
+        fhevm.provider.getBalance(payrollAddress),
       ]);
       setWalletBalance(parseFloat(ethers.formatEther(wWei)).toFixed(4));
       setContractBalance(parseFloat(ethers.formatEther(cWei)).toFixed(4));
     } catch { /* ignore */ }
+  };
+
+  // ─── Deploy / connect handlers ─────────────────────────────────────────────
+
+  const handleDeploy = async () => {
+    if (!fhevm.signer || !fhevm.provider) return;
+    setDeploying(true);
+    setStatus(null);
+    try {
+      const factoryWithSigner = new Contract(FACTORY_ADDRESS, FACTORY_ABI, fhevm.signer);
+      const tx = await factoryWithSigner.create();
+      const receipt = await tx.wait();
+      // Pull the deployed address from the PayrollCreated event
+      const iface = new ethers.Interface(FACTORY_ABI as unknown as string[]);
+      let deployed = "";
+      for (const log of receipt.logs) {
+        try {
+          const parsed = iface.parseLog(log);
+          if (parsed?.name === "PayrollCreated") {
+            deployed = parsed.args[1] as string;
+            break;
+          }
+        } catch { /* skip unrelated logs */ }
+      }
+      if (!deployed) throw new Error("Could not find deployed contract address in receipt");
+      setPayrollAddress(deployed);
+      setSetupPhase("ready");
+      ok("Payroll contract deployed!");
+    } catch (e: unknown) {
+      setStatus({ text: e instanceof Error ? e.message : "Deploy failed", ok: false });
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleConnectContract = () => {
+    const addr = contractInput.trim();
+    if (!ethers.isAddress(addr)) {
+      setStatus({ text: "Invalid address — please enter a valid 0x… address", ok: false });
+      return;
+    }
+    setPayrollAddress(addr);
+    setSetupPhase("ready");
   };
 
   const loadEmployerAddr = async () => {
@@ -196,7 +275,7 @@ export default function App() {
     wrap("Add employee", async () => {
       if (!fhevm.instance) throw new Error("FHEVM instance not ready");
       const salaryWei = ethers.parseEther(newSalary);
-      const input = fhevm.instance.createEncryptedInput(CONTRACT_ADDRESS, fhevm.address);
+      const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(salaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
       const tx = await contract(true).addEmployee(newEmployee, salaryWei, handles[0], inputProof);
@@ -208,7 +287,7 @@ export default function App() {
     wrap("Update salary", async () => {
       if (!fhevm.instance) throw new Error("FHEVM instance not ready");
       const newSalaryWei = ethers.parseEther(updateSalary);
-      const input = fhevm.instance.createEncryptedInput(CONTRACT_ADDRESS, fhevm.address);
+      const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(newSalaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
       const tx = await contract(true).updateSalary(updateTarget, newSalaryWei, handles[0], inputProof);
@@ -261,7 +340,7 @@ export default function App() {
     const { publicKey, privateKey } = fhevm.instance.generateKeypair();
     const startTimestamp = Math.floor(Date.now() / 1000);
     const durationDays = 100;
-    const eip712 = fhevm.instance.createEIP712(publicKey, [CONTRACT_ADDRESS], startTimestamp, durationDays);
+    const eip712 = fhevm.instance.createEIP712(publicKey, [payrollAddress], startTimestamp, durationDays);
     const signature = await fhevm.signer.signTypedData(
       eip712.domain,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -269,9 +348,9 @@ export default function App() {
       eip712.message,
     );
     const results = await fhevm.instance.userDecrypt(
-      [{ handle, contractAddress: CONTRACT_ADDRESS }],
+      [{ handle, contractAddress: payrollAddress }],
       privateKey, publicKey, signature,
-      [CONTRACT_ADDRESS], fhevm.address, startTimestamp, durationDays,
+      [payrollAddress], fhevm.address, startTimestamp, durationDays,
     );
     return Object.values(results)[0] as bigint;
   };
@@ -379,8 +458,9 @@ export default function App() {
 
       <main style={{ maxWidth: 980, margin: "0 auto", padding: "32px 24px 64px" }}>
 
-        {/* ── Not connected ── */}
+        {/* ── Main render switch ── */}
         {!fhevm.address ? (
+          /* Not connected */
           <div style={{ textAlign: "center", padding: "80px 0" }}>
             <div style={{ width: 60, height: 60, borderRadius: 16, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFD100" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -400,7 +480,72 @@ export default function App() {
             {fhevm.loading && <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted)" }}>Loading WASM modules — takes ~10s on first visit</p>}
             {fhevm.error && <p style={{ color: "var(--danger)", marginTop: 12, fontSize: 13 }}>{fhevm.error}</p>}
           </div>
+        ) : setupPhase === "checking" ? (
+          /* Checking factory */
+          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)", fontSize: 13 }}>
+            Checking your account…
+          </div>
+        ) : setupPhase === "setup" ? (
+          /* Setup screen */
+          <div style={{ maxWidth: 480, margin: "60px auto 0", display: "flex", flexDirection: "column", gap: 16 }}>
+            {status && (
+              <div style={{
+                background: status.ok ? "var(--success-dim)" : "var(--danger-dim)",
+                border: `1px solid ${status.ok ? "rgba(74,222,128,0.25)" : "rgba(248,113,113,0.25)"}`,
+                borderRadius: "var(--radius-sm)", padding: "11px 16px", fontSize: 13,
+                color: status.ok ? "var(--success)" : "var(--danger)",
+              }}>
+                {status.text}
+              </div>
+            )}
+            {/* Deploy card */}
+            <div className="card" style={{ borderColor: "rgba(255,209,0,0.2)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <LockIcon />
+                </div>
+                <div>
+                  <h2 style={{ marginBottom: 2 }}>I'm an Employer</h2>
+                  <p style={{ fontSize: 12, color: "var(--muted)" }}>Deploy your own private payroll contract</p>
+                </div>
+              </div>
+              <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 16 }}>
+                Creates a fresh <strong style={{ color: "var(--text)" }}>ConfidentialPayroll</strong> contract
+                owned by your wallet. You pay a small one-time gas fee (~0.001 ETH) to deploy it.
+              </p>
+              <button className="btn-primary" onClick={handleDeploy} disabled={deploying} style={{ justifyContent: "center", width: "100%" }}>
+                {deploying ? "Deploying…" : "Deploy My Payroll Contract"}
+              </button>
+            </div>
+            <div style={{ textAlign: "center", fontSize: 12, color: "var(--muted)" }}>— or —</div>
+            {/* Employee card */}
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--success-dim)", border: "1px solid rgba(74,222,128,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 style={{ marginBottom: 2 }}>I'm an Employee</h2>
+                  <p style={{ fontSize: 12, color: "var(--muted)" }}>Enter your employer's contract address</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  placeholder="0x… employer's payroll contract"
+                  value={contractInput}
+                  onChange={e => setContractInput(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button className="btn-ghost" onClick={handleConnectContract} disabled={!contractInput} style={{ whiteSpace: "nowrap" }}>
+                  Connect
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
+          /* Ready — full app */
           <>
             {/* ── Status banner ── */}
             {status && (
@@ -450,7 +595,7 @@ export default function App() {
             </div>
 
             {tab === "history" ? (
-              fhevm.provider && <TxHistory provider={fhevm.provider} />
+              fhevm.provider && payrollAddress && <TxHistory provider={fhevm.provider} contractAddress={payrollAddress} />
             ) : (
               <>
                 {/* ══ EMPLOYER PANEL ══ */}
@@ -808,10 +953,12 @@ export default function App() {
       {/* ── Footer ── */}
       {fhevm.address && (
         <footer style={{ borderTop: "1px solid var(--border)", padding: "16px 24px", display: "flex", justifyContent: "center", gap: 24, fontSize: 12, color: "var(--muted)" }}>
-          <span>Contract: <code>{short(CONTRACT_ADDRESS)}</code></span>
-          <span>·</span>
-          <a href={`https://sepolia.etherscan.io/address/${CONTRACT_ADDRESS}`} target="_blank" rel="noreferrer">View on Etherscan ↗</a>
-          <span>·</span>
+          {payrollAddress && <>
+            <span>Contract: <code>{short(payrollAddress)}</code></span>
+            <span>·</span>
+            <a href={`https://sepolia.etherscan.io/address/${payrollAddress}`} target="_blank" rel="noreferrer">View on Etherscan ↗</a>
+            <span>·</span>
+          </>}
           <span>Powered by <a href="https://zama.ai" target="_blank" rel="noreferrer">Zama FHEVM</a></span>
         </footer>
       )}

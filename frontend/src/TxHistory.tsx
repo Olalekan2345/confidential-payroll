@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Contract, BrowserProvider, EventLog, ethers, Log } from "ethers";
-import { ABI, CONTRACT_ADDRESS } from "./contract";
+import { PAYROLL_ABI } from "./contract";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ const BADGE: Record<string, { bg: string; color: string }> = {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function TxHistory({ provider }: { provider: BrowserProvider }) {
+export function TxHistory({ provider, contractAddress }: { provider: BrowserProvider; contractAddress: string }) {
   const [rows, setRows] = useState<TxRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,7 +65,7 @@ export function TxHistory({ provider }: { provider: BrowserProvider }) {
     setLoading(true);
     setError("");
     try {
-      const c = new Contract(CONTRACT_ADDRESS, ABI, provider);
+      const c = new Contract(contractAddress, PAYROLL_ABI, provider);
       const currentBlock = await provider.getBlockNumber();
       const fromBlock = Math.max(0, currentBlock - SCAN_DEPTH);
 

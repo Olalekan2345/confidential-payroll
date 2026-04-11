@@ -49,6 +49,10 @@ declare module "hardhat/types/runtime" {
       name: "ConfidentialPayroll",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ConfidentialPayroll__factory>;
+    getContractFactory(
+      name: "ConfidentialPayrollFactory",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.ConfidentialPayrollFactory__factory>;
 
     getContractAt(
       name: "ZamaConfig",
@@ -95,6 +99,11 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.ConfidentialPayroll>;
+    getContractAt(
+      name: "ConfidentialPayrollFactory",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.ConfidentialPayrollFactory>;
 
     deployContract(
       name: "ZamaConfig",
@@ -132,6 +141,10 @@ declare module "hardhat/types/runtime" {
       name: "ConfidentialPayroll",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ConfidentialPayroll>;
+    deployContract(
+      name: "ConfidentialPayrollFactory",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.ConfidentialPayrollFactory>;
 
     deployContract(
       name: "ZamaConfig",
@@ -178,6 +191,11 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ConfidentialPayroll>;
+    deployContract(
+      name: "ConfidentialPayrollFactory",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.ConfidentialPayrollFactory>;
 
     // default types
     getContractFactory(

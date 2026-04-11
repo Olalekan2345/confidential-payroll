@@ -52,8 +52,9 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
 
     // ─── Constructor ──────────────────────────────────────────────────────────
 
-    constructor() {
-        employer = msg.sender;
+    constructor(address _employer) {
+        require(_employer != address(0), "ConfidentialPayroll: zero employer");
+        employer = _employer;
     }
 
     // ─── Fund ─────────────────────────────────────────────────────────────────

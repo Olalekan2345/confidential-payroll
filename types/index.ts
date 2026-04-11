@@ -24,3 +24,5 @@ export type { IInputVerifier } from "./@fhevm/solidity/lib/Impl.sol/IInputVerifi
 export { IInputVerifier__factory } from "./factories/@fhevm/solidity/lib/Impl.sol/IInputVerifier__factory";
 export type { ConfidentialPayroll } from "./contracts/ConfidentialPayroll";
 export { ConfidentialPayroll__factory } from "./factories/contracts/ConfidentialPayroll__factory";
+export type { ConfidentialPayrollFactory } from "./contracts/ConfidentialPayrollFactory";
+export { ConfidentialPayrollFactory__factory } from "./factories/contracts/ConfidentialPayrollFactory__factory";

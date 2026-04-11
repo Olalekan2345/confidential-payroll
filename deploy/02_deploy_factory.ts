@@ -7,22 +7,24 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts();
 
   log("─────────────────────────────────────────────────");
-  log(`Deploying ConfidentialPayroll on network: ${network.name}`);
+  log(`Deploying ConfidentialPayrollFactory on network: ${network.name}`);
   log(`Deployer address: ${deployer}`);
 
-  // NOTE: With the factory pattern, ConfidentialPayroll is normally deployed
-  // via ConfidentialPayrollFactory.create() which sets the employer correctly.
-  // This direct deploy is only for testing — deployer becomes employer.
-  const result = await deploy("ConfidentialPayroll", {
+  const result = await deploy("ConfidentialPayrollFactory", {
     from: deployer,
-    args: [deployer], // deployer is the employer
+    args: [],
     log: true,
     waitConfirmations: network.name === "hardhat" ? 0 : 2,
   });
 
-  log(`ConfidentialPayroll deployed at: ${result.address}`);
+  log(`ConfidentialPayrollFactory deployed at: ${result.address}`);
+  log(`Update FACTORY_ADDRESS in frontend/src/contract.ts with this address.`);
 
-  if (network.name === "sepolia" && process.env.ETHERSCAN_API_KEY && process.env.ETHERSCAN_API_KEY !== "your_etherscan_api_key_here") {
+  if (
+    network.name === "sepolia" &&
+    process.env.ETHERSCAN_API_KEY &&
+    process.env.ETHERSCAN_API_KEY !== "your_etherscan_api_key_here"
+  ) {
     log("Verifying on Etherscan...");
     try {
       await hre.run("verify:verify", {
@@ -36,5 +38,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 };
 
-func.tags = ["ConfidentialPayroll"];
+func.tags = ["ConfidentialPayrollFactory"];
+func.dependencies = ["ConfidentialPayroll"]; // ensure ConfidentialPayroll artifact exists first
 export default func;
