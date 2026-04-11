@@ -52,6 +52,9 @@ export default function App() {
   const [contractInput,  setContractInput]  = useState("");
   const [deploying,      setDeploying]      = useState(false);
 
+  // Role view — employers can toggle to see the employee panel
+  const [viewAs, setViewAs] = useState<"employer" | "employee">("employer");
+
   const [employees,         setEmployees]         = useState<EmployeeRow[]>([]);
   const [status,            setStatus]            = useState<StatusMsg | null>(null);
   const [busy,              setBusy]              = useState(false);
@@ -137,6 +140,7 @@ export default function App() {
     setMyTotalPaidDecrypted(null);
     setShowSalary(false);
     setShowTotalPaid(false);
+    setViewAs("employer");
 
     (async () => {
       try {
@@ -359,7 +363,7 @@ export default function App() {
     if (!fhevm.instance) return fail("FHEVM instance not ready");
     setBusy(true); setStatus(null);
     try {
-      const handle = await contract().getMySalary();
+      const handle = await contract(true).getMySalary();
       const val = await userDecryptHandle(handle);
       const ethAmt1 = ethers.formatEther(val);
       const usd1 = toUsd(ethAmt1);
@@ -374,7 +378,7 @@ export default function App() {
     if (!fhevm.instance) return fail("FHEVM instance not ready");
     setBusy(true); setStatus(null);
     try {
-      const handle = await contract().getMyTotalPaid();
+      const handle = await contract(true).getMyTotalPaid();
       const val = await userDecryptHandle(handle);
       const ethAmt2 = ethers.formatEther(val);
       const usd2 = toUsd(ethAmt2);
@@ -410,6 +414,8 @@ export default function App() {
     setEmpSalaryShown(prev => ({ ...prev, [addr]: !prev[addr] }));
 
   const activeCount = employees.filter(e => e.active).length;
+  // showEmployerView drives all panel visibility — employers can toggle via viewAs
+  const showEmployerView = fhevm.isEmployer && viewAs === "employer";
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -447,6 +453,16 @@ export default function App() {
               <span className={`tag ${fhevm.isEmployer ? "tag-active" : "tag-encrypted"}`}>
                 {fhevm.isEmployer ? "Employer" : "Employee"}
               </span>
+              {fhevm.isEmployer && setupPhase === "ready" && (
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => setViewAs(v => v === "employer" ? "employee" : "employer")}
+                  style={{ fontSize: 11, padding: "4px 10px" }}
+                  title="Switch view"
+                >
+                  {viewAs === "employer" ? "View as Employee" : "View as Employer"}
+                </button>
+              )}
             </div>
           ) : (
             <button className="btn-primary" onClick={fhevm.connect} disabled={fhevm.loading}>
@@ -562,7 +578,7 @@ export default function App() {
             )}
 
             {/* ── Stat row (employer) ── */}
-            {fhevm.isEmployer && (
+            {showEmployerView && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
                 {[
                   { label: "Pool Balance",     value: contractBalance ? `${contractBalance} ETH` : "—", sub: contractBalance ? toUsd(contractBalance) : null, cls: "accent" },
@@ -599,7 +615,7 @@ export default function App() {
             ) : (
               <>
                 {/* ══ EMPLOYER PANEL ══ */}
-                {fhevm.isEmployer && (
+                {showEmployerView && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
 
                     {/* Payroll Pool */}
@@ -690,7 +706,7 @@ export default function App() {
                         {employees.length}
                       </span>
                     </div>
-                    {fhevm.isEmployer && (
+                    {showEmployerView && (
                       <div style={{ display: "flex", gap: 8 }}>
                         <button className="btn-ghost btn-sm" onClick={handlePaySelected} disabled={busy || selectedEmployees.size === 0}>
                           Pay Selected ({selectedEmployees.size})
@@ -706,22 +722,22 @@ export default function App() {
                     <div className="card" style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)" }}>
                       <div style={{ fontSize: 28, marginBottom: 10 }}>👤</div>
                       <p style={{ fontSize: 13 }}>No employees registered yet.</p>
-                      {fhevm.isEmployer && <p style={{ fontSize: 12, marginTop: 6 }}>Use the form above to add your first employee.</p>}
+                      {showEmployerView && <p style={{ fontSize: 12, marginTop: 6 }}>Use the form above to add your first employee.</p>}
                     </div>
                   ) : (
                     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                       {/* Table header */}
                       <div style={{
                         display: "grid",
-                        gridTemplateColumns: fhevm.isEmployer ? "28px 1fr 90px 150px 160px 130px" : "1fr 90px 150px 160px",
+                        gridTemplateColumns: showEmployerView ? "28px 1fr 90px 150px 160px 130px" : "1fr 90px 150px 160px",
                         gap: "0 12px", padding: "10px 16px",
                         borderBottom: "1px solid var(--border)", background: "var(--surface-2)",
                       }}>
-                        {fhevm.isEmployer && <div />}
+                        {showEmployerView && <div />}
                         {["Address", "Status", "Last Paid", "Salary"].map(h => (
                           <div key={h} style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
                         ))}
-                        {fhevm.isEmployer && <div />}
+                        {showEmployerView && <div />}
                       </div>
 
                       {employees.map((emp, i) => {
@@ -731,13 +747,13 @@ export default function App() {
                         return (
                           <div key={emp.address} style={{
                             display: "grid",
-                            gridTemplateColumns: fhevm.isEmployer ? "28px 1fr 90px 150px 160px 130px" : "1fr 90px 150px 160px",
+                            gridTemplateColumns: showEmployerView ? "28px 1fr 90px 150px 160px 130px" : "1fr 90px 150px 160px",
                             gap: "0 12px", padding: "12px 16px", alignItems: "center",
                             borderBottom: i < employees.length - 1 ? "1px solid var(--border)" : "none",
                             background: selectedEmployees.has(emp.address) ? "rgba(255,209,0,0.03)" : "transparent",
                             transition: "background 0.1s",
                           }}>
-                            {fhevm.isEmployer && (
+                            {showEmployerView && (
                               emp.active
                                 ? <input type="checkbox" checked={selectedEmployees.has(emp.address)} onChange={() => toggleSelect(emp.address)} />
                                 : <div />
@@ -750,7 +766,7 @@ export default function App() {
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                               {!decrypted ? (
                                 // Not yet decrypted
-                                fhevm.isEmployer ? (
+                                showEmployerView ? (
                                   <button
                                     className="btn-ghost btn-sm"
                                     onClick={() => handleDecryptEmpSalary(emp.address)}
@@ -789,7 +805,7 @@ export default function App() {
                               )}
                             </div>
 
-                            {fhevm.isEmployer && (
+                            {showEmployerView && (
                               emp.active ? (
                                 <div style={{ display: "flex", gap: 6 }}>
                                   <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy}>Pay</button>
@@ -805,7 +821,7 @@ export default function App() {
                 </div>
 
                 {/* ══ EMPLOYEE SELF-SERVICE ══ */}
-                {!fhevm.isEmployer && (
+                {!showEmployerView && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
                   {/* How you receive salary */}
