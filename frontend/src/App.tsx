@@ -648,7 +648,13 @@ export default function App() {
             </div>
 
             {tab === "history" ? (
-              fhevm.provider && payrollAddress && <TxHistory provider={fhevm.provider} contractAddress={payrollAddress} />
+              fhevm.provider && payrollAddress && (
+                <TxHistory
+                  provider={fhevm.provider}
+                  contractAddress={payrollAddress}
+                  filterAddress={showEmployerView ? undefined : fhevm.address}
+                />
+              )
             ) : (
               <>
                 {/* ══ EMPLOYER PANEL ══ */}

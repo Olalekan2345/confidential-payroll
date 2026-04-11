@@ -4,17 +4,12 @@ import { PAYROLL_ABI } from "./contract";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Free-tier RPCs (including drpc.org / MetaMask's provider) cap eth_getLogs at
-// 10,000 blocks per request. We chunk into 9,500-block slices and run them in
-// parallel, then merge results.
 const CHUNK_SIZE = 9_500;
-// How far back to scan. ~20,000 blocks ≈ 2.7 days on Sepolia — covers any
-// contract deployed in the current session. Adjust upward if needed.
 const SCAN_DEPTH = 20_000;
 
 async function queryChunked(
   contract: Contract,
-  eventName: string,
+  filter: Parameters<Contract["queryFilter"]>[0],
   fromBlock: number,
   toBlock: number,
 ): Promise<(EventLog | Log)[]> {
@@ -23,12 +18,12 @@ async function queryChunked(
     ranges.push([start, Math.min(start + CHUNK_SIZE - 1, toBlock)]);
   }
   const chunks = await Promise.all(
-    ranges.map(([from, to]) => contract.queryFilter(eventName, from, to)),
+    ranges.map(([from, to]) => contract.queryFilter(filter, from, to)),
   );
   return chunks.flat();
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type TxRow = {
   id: string;
@@ -44,19 +39,25 @@ type TxRow = {
 const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
 const BADGE: Record<string, { bg: string; color: string }> = {
-  "Payroll Funded":     { bg: "#2a2200", color: "#FFD100" },
-  "Employee Added":     { bg: "#1a2e0f", color: "#4ade80" },
-  "Salary Updated":    { bg: "#1e1e2e", color: "#a5b4fc" },
-  "Salary Paid":       { bg: "#2a2200", color: "#FFD100" },
-  "Employee Removed":  { bg: "#2d0f0f", color: "#f87171" },
-  "Payroll Withdrawn": { bg: "#2a1500", color: "#fb923c" },
-  "Withdraw Requested":{ bg: "#1a2e0f", color: "#4ade80" },
-  "Salary Withdrawn":  { bg: "#1a2e0f", color: "#4ade80" },
+  "Payroll Funded":    { bg: "#2a2200", color: "#FFD100" },
+  "Employee Added":    { bg: "#1a2e0f", color: "#4ade80" },
+  "Salary Updated":   { bg: "#1e1e2e", color: "#a5b4fc" },
+  "Salary Paid":      { bg: "#2a2200", color: "#FFD100" },
+  "Employee Removed": { bg: "#2d0f0f", color: "#f87171" },
+  "Payroll Withdrawn":{ bg: "#2a1500", color: "#fb923c" },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function TxHistory({ provider, contractAddress }: { provider: BrowserProvider; contractAddress: string }) {
+export function TxHistory({
+  provider,
+  contractAddress,
+  filterAddress,   // if set → employee view: only show this address's events
+}: {
+  provider: BrowserProvider;
+  contractAddress: string;
+  filterAddress?: string;
+}) {
   const [rows, setRows] = useState<TxRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -69,16 +70,6 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
       const currentBlock = await provider.getBlockNumber();
       const fromBlock = Math.max(0, currentBlock - SCAN_DEPTH);
 
-      // Fetch all event types in parallel, each split into 9,500-block chunks
-      const [funded, added, removed, updated, paid, withdrawn] = await Promise.all([
-        queryChunked(c, "PayrollFunded",    fromBlock, currentBlock),
-        queryChunked(c, "EmployeeAdded",    fromBlock, currentBlock),
-        queryChunked(c, "EmployeeRemoved",  fromBlock, currentBlock),
-        queryChunked(c, "SalaryUpdated",    fromBlock, currentBlock),
-        queryChunked(c, "SalaryPaid",       fromBlock, currentBlock),
-        queryChunked(c, "PayrollWithdrawn", fromBlock, currentBlock),
-      ]);
-
       const toRow = (log: EventLog, label: string, detail: string): TxRow => ({
         id: `${log.transactionHash}-${log.index}`,
         label,
@@ -88,37 +79,66 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
         timestamp: null,
       });
 
-      const all: TxRow[] = [
-        ...funded.map(log => {
-          const e = log as EventLog;
-          return toRow(e, "Payroll Funded",
-            `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH deposited`);
-        }),
-        ...added.map(log => {
-          const e = log as EventLog;
-          return toRow(e, "Employee Added", short(e.args[0] as string));
-        }),
-        ...removed.map(log => {
-          const e = log as EventLog;
-          return toRow(e, "Employee Removed", short(e.args[0] as string));
-        }),
-        ...updated.map(log => {
-          const e = log as EventLog;
-          return toRow(e, "Salary Updated", short(e.args[0] as string));
-        }),
-        ...paid.map(log => {
-          const e = log as EventLog;
-          const amt = e.args[1] ? ` · ${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH` : "";
-          return toRow(e, "Salary Paid", `${short(e.args[0] as string)}${amt}`);
-        }),
-        ...withdrawn.map(log => {
-          const e = log as EventLog;
-          return toRow(e, "Payroll Withdrawn",
-            `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH withdrawn`);
-        }),
-      ].sort((a, b) => b.blockNumber - a.blockNumber);
+      let all: TxRow[];
 
-      // Resolve block timestamps (batched by unique block)
+      if (filterAddress) {
+        // ── Employee view: only events involving this address ──────────────
+        // Use topic filters so only matching logs are fetched (no client-side scan).
+        const addr = filterAddress;
+        const [added, removed, updated, paid] = await Promise.all([
+          queryChunked(c, c.filters.EmployeeAdded(addr),   fromBlock, currentBlock),
+          queryChunked(c, c.filters.EmployeeRemoved(addr), fromBlock, currentBlock),
+          queryChunked(c, c.filters.SalaryUpdated(addr),   fromBlock, currentBlock),
+          queryChunked(c, c.filters.SalaryPaid(addr),      fromBlock, currentBlock),
+        ]);
+
+        all = [
+          ...added.map(log => toRow(log as EventLog, "Employee Added", "You were added to payroll")),
+          ...removed.map(log => toRow(log as EventLog, "Employee Removed", "You were removed from payroll")),
+          ...updated.map(log => toRow(log as EventLog, "Salary Updated", "Your salary was updated")),
+          ...paid.map(log => {
+            const e = log as EventLog;
+            const amt = e.args[1]
+              ? `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH received`
+              : "Salary received";
+            return toRow(e, "Salary Paid", amt);
+          }),
+        ].sort((a, b) => b.blockNumber - a.blockNumber);
+
+      } else {
+        // ── Employer view: all events ──────────────────────────────────────
+        const [funded, added, removed, updated, paid, withdrawn] = await Promise.all([
+          queryChunked(c, "PayrollFunded",    fromBlock, currentBlock),
+          queryChunked(c, "EmployeeAdded",    fromBlock, currentBlock),
+          queryChunked(c, "EmployeeRemoved",  fromBlock, currentBlock),
+          queryChunked(c, "SalaryUpdated",    fromBlock, currentBlock),
+          queryChunked(c, "SalaryPaid",       fromBlock, currentBlock),
+          queryChunked(c, "PayrollWithdrawn", fromBlock, currentBlock),
+        ]);
+
+        all = [
+          ...funded.map(log => {
+            const e = log as EventLog;
+            return toRow(e, "Payroll Funded",
+              `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH deposited`);
+          }),
+          ...added.map(log => toRow(log as EventLog, "Employee Added", short((log as EventLog).args[0] as string))),
+          ...removed.map(log => toRow(log as EventLog, "Employee Removed", short((log as EventLog).args[0] as string))),
+          ...updated.map(log => toRow(log as EventLog, "Salary Updated", short((log as EventLog).args[0] as string))),
+          ...paid.map(log => {
+            const e = log as EventLog;
+            const amt = e.args[1] ? ` · ${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH` : "";
+            return toRow(e, "Salary Paid", `${short(e.args[0] as string)}${amt}`);
+          }),
+          ...withdrawn.map(log => {
+            const e = log as EventLog;
+            return toRow(e, "Payroll Withdrawn",
+              `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH withdrawn`);
+          }),
+        ].sort((a, b) => b.blockNumber - a.blockNumber);
+      }
+
+      // Resolve block timestamps
       const uniqueBlocks = [...new Set(all.map(r => r.blockNumber))];
       const blockTs: Record<number, number> = {};
       await Promise.all(
@@ -140,9 +160,17 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
   useEffect(() => {
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [contractAddress, filterAddress]);
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
+  const subtitle = filterAddress
+    ? `Your transactions · ${rows.length} event${rows.length !== 1 ? "s" : ""}`
+    : `All payroll events · ${rows.length} event${rows.length !== 1 ? "s" : ""}`;
+
+  const emptyText = filterAddress
+    ? "No transactions found for your wallet in the last 20,000 blocks."
+    : "No transactions found in the last 20,000 blocks.";
 
   return (
     <div>
@@ -150,9 +178,7 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Transaction History</h2>
-          <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 0" }}>
-            Last 100,000 blocks · {rows.length} event{rows.length !== 1 ? "s" : ""}
-          </p>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 0" }}>{subtitle}</p>
         </div>
         <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
           {loading ? "Loading…" : "↻ Refresh"}
@@ -174,7 +200,7 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
         </div>
       )}
 
-      {/* Loading skeleton */}
+      {/* Loading */}
       {loading && (
         <div className="card" style={{ textAlign: "center", padding: "48px 0", color: "var(--muted)", fontSize: 13 }}>
           Scanning on-chain events…
@@ -184,9 +210,11 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
       {/* Empty state */}
       {!loading && rows.length === 0 && !error && (
         <div className="card" style={{ textAlign: "center", padding: "48px 0", color: "var(--muted)", fontSize: 13 }}>
-          No transactions found in the last 20,000 blocks.
+          {emptyText}
           <p style={{ fontSize: 12, marginTop: 8, color: "var(--muted)" }}>
-            Events appear here after funding, adding employees, and paying salaries.
+            {filterAddress
+              ? "Salary payments and status changes appear here."
+              : "Events appear here after funding, adding employees, and paying salaries."}
           </p>
         </div>
       )}
@@ -202,7 +230,6 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
                 className="card"
                 style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 16px" }}
               >
-                {/* Event type badge */}
                 <span style={{
                   padding: "3px 10px",
                   borderRadius: 999,
@@ -217,19 +244,16 @@ export function TxHistory({ provider, contractAddress }: { provider: BrowserProv
                   {row.label.toUpperCase()}
                 </span>
 
-                {/* Detail */}
                 <span style={{ fontSize: 13, flex: 1, minWidth: 100 }}>
                   {row.detail}
                 </span>
 
-                {/* Timestamp or block number */}
                 <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>
                   {row.timestamp
                     ? new Date(row.timestamp * 1000).toLocaleString()
                     : `Block #${row.blockNumber}`}
                 </span>
 
-                {/* Etherscan link */}
                 <a
                   href={`https://sepolia.etherscan.io/tx/${row.txHash}`}
                   target="_blank"
