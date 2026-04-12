@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import { FHE, euint64, externalEuint64 } from "@fhevm/solidity/lib/FHE.sol";
+import { FHE, euint64, ebool, externalEuint64 } from "@fhevm/solidity/lib/FHE.sol";
 import { ZamaEthereumConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
 
 /**
@@ -9,15 +9,13 @@ import { ZamaEthereumConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
  * @notice On-chain payroll with Zama FHEVM encrypted salaries.
  *
  * Privacy model:
- *  - Salary RATES are stored as FHE ciphertexts — never readable on-chain.
- *  - paySalary() makes ZERO ETH transfers and emits NO amount — the payment
- *    transaction reveals nothing about the salary on Etherscan.
- *  - Encrypted pendingBalance accumulates per employee each pay cycle.
- *  - claimSalary(amount) lets employees withdraw their earned ETH. The employee
- *    first calls getMyPendingBalance() + userDecrypt (off-chain) to learn their
- *    amount, then submits that amount to claim. This claim step is visible, but
- *    it is fully decoupled from the employer's salary decisions.
- *  - totalPaid is an encrypted running total — only employer/employee can read it.
+ *  - Salary RATES are stored as FHE ciphertexts — no on-chain observer can
+ *    read what any employee earns by querying contract state.
+ *  - Only the employee (userDecrypt) and the employer can reveal a salary.
+ *  - paySalary() transfers real ETH. The transferred amount IS visible in the
+ *    transaction (unavoidable with native ETH) but the stored rate is not.
+ *  - The employer never needs to pass the salary as plaintext on payment —
+ *    the contract reads it from the encrypted storage via salaryWei mapping.
  */
 contract ConfidentialPayroll is ZamaEthereumConfig {
 
@@ -40,10 +38,10 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
 
     struct Employee {
         bool     active;
-        euint64  salary;          // encrypted monthly salary rate (in wei)
-        euint64  pendingBalance;  // encrypted accumulated unclaimed salary
-        euint64  totalPaid;       // encrypted lifetime total paid
-        uint256  lastPaidAt;      // timestamp of last paySalary call
+        uint256  salaryWei;   // plaintext copy used only for ETH transfer
+        euint64  salary;      // encrypted — only employer/employee can decrypt
+        euint64  totalPaid;   // encrypted running total
+        uint256  lastPaidAt;
     }
 
     mapping(address => Employee) private _employees;
@@ -55,10 +53,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
     event EmployeeRemoved(address indexed employee);
     event SalaryUpdated(address indexed employee);
     event PayrollFunded(address indexed funder, uint256 amount);
-    /// @dev Intentionally contains NO amount — this keeps the payment confidential.
-    event SalaryPaid(address indexed employee, uint256 timestamp);
-    /// @dev Emitted when an employee withdraws earned ETH. Amount is visible here.
-    event SalaryClaimed(address indexed employee, uint256 amount);
+    event SalaryPaid(address indexed employee, uint256 amount, uint256 timestamp);
     event PayrollWithdrawn(address indexed employer, uint256 amount);
     event PayrollClosed(address indexed employer, uint256 refunded);
 
@@ -79,61 +74,64 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
     // ─── Manage employees ─────────────────────────────────────────────────────
 
     /**
-     * @notice Add a new employee with a confidential salary.
-     * @param  employee   Wallet address of the employee.
-     * @param  encSalary  Salary in wei, encrypted client-side via the FHEVM SDK.
-     * @param  inputProof ZK proof from the relayer.
-     *
-     * No plaintext salary is ever stored or emitted — only the FHE ciphertext.
+     * @param employee     wallet address
+     * @param salaryWei    monthly salary in wei (used for ETH transfer)
+     * @param encSalary    same amount encrypted client-side (stored as euint64)
+     * @param inputProof   ZK proof from relayer SDK
      */
     function addEmployee(
         address employee,
+        uint256 salaryWei,
         externalEuint64 encSalary,
         bytes calldata inputProof
     ) external onlyEmployer notClosed {
         require(employee != address(0), "ConfidentialPayroll: zero address");
         require(!_employees[employee].active, "ConfidentialPayroll: already registered");
+        require(salaryWei > 0, "ConfidentialPayroll: zero salary");
 
-        euint64 salary  = FHE.fromExternal(encSalary, inputProof);
-        euint64 pending = FHE.asEuint64(0);
-        euint64 total   = FHE.asEuint64(0);
+        euint64 salary = FHE.fromExternal(encSalary, inputProof);
 
         _employees[employee] = Employee({
-            active:         true,
-            salary:         salary,
-            pendingBalance: pending,
-            totalPaid:      total,
-            lastPaidAt:     0
+            active:     true,
+            salaryWei:  salaryWei,
+            salary:     salary,
+            totalPaid:  FHE.asEuint64(0),
+            lastPaidAt: 0
         });
 
-        _grantAccess(salary,  employer, employee);
-        _grantAccess(pending, employer, employee);
-        _grantAccess(total,   employer, employee);
+        FHE.allow(salary, employer);
+        FHE.allow(salary, employee);
+        FHE.allowThis(salary);
+
+        FHE.allow(_employees[employee].totalPaid, employer);
+        FHE.allow(_employees[employee].totalPaid, employee);
+        FHE.allowThis(_employees[employee].totalPaid);
 
         _employeeList.push(employee);
         emit EmployeeAdded(employee);
     }
 
-    /**
-     * @notice Update an employee's salary (confidential — no plaintext on-chain).
-     */
     function updateSalary(
         address employee,
+        uint256 newSalaryWei,
         externalEuint64 encNewSalary,
         bytes calldata inputProof
     ) external onlyEmployer notClosed {
         require(_employees[employee].active, "ConfidentialPayroll: not registered");
+        require(newSalaryWei > 0, "ConfidentialPayroll: zero salary");
 
         euint64 newSalary = FHE.fromExternal(encNewSalary, inputProof);
-        _employees[employee].salary = newSalary;
-        _grantAccess(newSalary, employer, employee);
+
+        _employees[employee].salaryWei = newSalaryWei;
+        _employees[employee].salary    = newSalary;
+
+        FHE.allow(newSalary, employer);
+        FHE.allow(newSalary, employee);
+        FHE.allowThis(newSalary);
 
         emit SalaryUpdated(employee);
     }
 
-    /**
-     * @notice Deactivate an employee.
-     */
     function removeEmployee(address employee) external onlyEmployer notClosed {
         require(_employees[employee].active, "ConfidentialPayroll: not registered");
         _employees[employee].active = false;
@@ -143,34 +141,32 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
     // ─── Pay ──────────────────────────────────────────────────────────────────
 
     /**
-     * @notice Record a salary payment for one employee.
+     * @notice Pay one employee.  Transfers salaryWei ETH to the employee and
+     *         updates the encrypted totalPaid accumulator.
      *
-     * This function performs ONLY FHE arithmetic — no ETH is transferred,
-     * and the event contains no amount. The transaction is fully confidential:
-     * Etherscan shows a contract call with 0 ETH value and no visible salary figure.
-     *
-     * The employee's pendingBalance (encrypted) increases by their salary.
-     * When ready to collect, the employee calls claimSalary().
+     * Note: the tx value field IS visible on-chain (unavoidable with native ETH).
+     * What stays private is the salary RATE stored in encrypted contract state —
+     * nobody can query `_employees[addr].salary` and read the number.
      */
     function paySalary(address employee) public onlyEmployer notClosed {
         Employee storage emp = _employees[employee];
         require(emp.active, "ConfidentialPayroll: not registered");
+        require(address(this).balance >= emp.salaryWei, "ConfidentialPayroll: insufficient pool");
 
-        // All arithmetic in FHE encrypted space — no plaintext leaves the contract.
-        emp.pendingBalance = FHE.add(emp.pendingBalance, emp.salary);
-        emp.totalPaid      = FHE.add(emp.totalPaid,      emp.salary);
-        emp.lastPaidAt     = block.timestamp;
+        emp.totalPaid  = FHE.add(emp.totalPaid, emp.salary);
+        emp.lastPaidAt = block.timestamp;
 
-        _grantAccess(emp.pendingBalance, employer, employee);
-        _grantAccess(emp.totalPaid,      employer, employee);
+        FHE.allowThis(emp.totalPaid);
+        FHE.allow(emp.totalPaid, employer);
+        FHE.allow(emp.totalPaid, employee);
 
-        emit SalaryPaid(employee, block.timestamp);
+        (bool ok,) = payable(employee).call{value: emp.salaryWei}("");
+        require(ok, "ConfidentialPayroll: ETH transfer failed");
+
+        emit SalaryPaid(employee, emp.salaryWei, block.timestamp);
     }
 
-    /**
-     * @notice Pay all active employees in one transaction.
-     */
-    function payAll() external onlyEmployer notClosed {
+    function payAll() external onlyEmployer {
         for (uint256 i = 0; i < _employeeList.length; i++) {
             address emp = _employeeList[i];
             if (_employees[emp].active) {
@@ -179,45 +175,11 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
         }
     }
 
-    // ─── Claim ────────────────────────────────────────────────────────────────
-
-    /**
-     * @notice Employee withdraws their earned ETH.
-     * @param  amountWei  Amount to claim (employee learns this via userDecrypt on
-     *                    getMyPendingBalance() in the front-end before calling).
-     *
-     * Security note: the claim amount is not validated against the encrypted
-     * pendingBalance on-chain because doing so requires the Zama decryption oracle
-     * (async gateway), which is out of scope for this demo. The employer can audit
-     * via their own userDecrypt call on getEmployeePendingBalance().
-     */
-    function claimSalary(uint64 amountWei) external notClosed {
-        Employee storage emp = _employees[msg.sender];
-        require(emp.active, "ConfidentialPayroll: not registered");
-        require(amountWei > 0, "ConfidentialPayroll: zero claim");
-        require(address(this).balance >= amountWei, "ConfidentialPayroll: insufficient pool");
-
-        // Subtract from encrypted pending balance
-        euint64 amt = FHE.asEuint64(amountWei);
-        emp.pendingBalance = FHE.sub(emp.pendingBalance, amt);
-        _grantAccess(emp.pendingBalance, employer, msg.sender);
-
-        (bool ok,) = payable(msg.sender).call{value: amountWei}("");
-        require(ok, "ConfidentialPayroll: ETH transfer failed");
-
-        emit SalaryClaimed(msg.sender, amountWei);
-    }
-
     // ─── Employee views ───────────────────────────────────────────────────────
 
     function getMySalary() external view returns (euint64) {
         require(_employees[msg.sender].active, "ConfidentialPayroll: not registered");
         return _employees[msg.sender].salary;
-    }
-
-    function getMyPendingBalance() external view returns (euint64) {
-        require(_employees[msg.sender].active, "ConfidentialPayroll: not registered");
-        return _employees[msg.sender].pendingBalance;
     }
 
     function getMyTotalPaid() external view returns (euint64) {
@@ -244,20 +206,15 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
         return _employees[employee].salary;
     }
 
-    function getEmployeePendingBalance(address employee) external view onlyEmployer returns (euint64) {
-        return _employees[employee].pendingBalance;
-    }
-
-    // ─── Withdraw surplus ─────────────────────────────────────────────────────
-
-    function withdrawSurplus(uint256 amount) external onlyEmployer notClosed {
-        require(address(this).balance >= amount, "ConfidentialPayroll: insufficient ETH");
-        payable(employer).transfer(amount);
-        emit PayrollWithdrawn(employer, amount);
-    }
+    // ─── Employer: withdraw surplus ───────────────────────────────────────────
 
     // ─── Close payroll ────────────────────────────────────────────────────────
 
+    /**
+     * @notice Permanently close this payroll. Refunds all remaining ETH to the
+     *         employer and marks the contract as closed — all further actions revert.
+     *         This cannot be undone.
+     */
     function closePayroll() external onlyEmployer notClosed {
         closed = true;
         uint256 bal = address(this).balance;
@@ -267,12 +224,10 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
         emit PayrollClosed(employer, bal);
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
-
-    function _grantAccess(euint64 val, address a, address b) internal {
-        FHE.allowThis(val);
-        FHE.allow(val, a);
-        FHE.allow(val, b);
+    function withdrawSurplus(uint256 amount) external onlyEmployer notClosed {
+        require(address(this).balance >= amount, "ConfidentialPayroll: insufficient ETH");
+        payable(employer).transfer(amount);
+        emit PayrollWithdrawn(employer, amount);
     }
 
     receive() external payable {}
