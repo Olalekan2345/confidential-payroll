@@ -3,6 +3,7 @@ import { Contract, ethers } from "ethers";
 import { FACTORY_ADDRESS, FACTORY_ABI, PAYROLL_ABI } from "./contract";
 import { useFhevm } from "./useFhevm";
 import { TxHistory } from "./TxHistory";
+import { SwapTab } from "./SwapTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ export default function App() {
   const [employees,         setEmployees]         = useState<EmployeeRow[]>([]);
   const [status,            setStatus]            = useState<StatusMsg | null>(null);
   const [busy,              setBusy]              = useState(false);
-  const [tab,               setTab]               = useState<"overview" | "history">("overview");
+  const [tab,               setTab]               = useState<"overview" | "history" | "swap">("overview");
   const [walletBalance,     setWalletBalance]     = useState<string | null>(null);
   const [contractBalance,   setContractBalance]   = useState<string | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
@@ -786,24 +787,41 @@ export default function App() {
 
             {/* ── Tab bar ── */}
             <div style={{ display: "flex", gap: 4, background: "var(--bg-alt)", border: "1.5px solid var(--border)", borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
-              {(["overview", "history"] as const).map(t => (
-                <button key={t} onClick={() => setTab(t)} style={{
-                  background: tab === t ? "var(--surface)" : "transparent",
+              {([
+                { key: "overview", label: "Overview" },
+                { key: "history",  label: "Tx History" },
+                { key: "swap",     label: "⇄ Swap" },
+              ] as const).map(({ key, label }) => (
+                <button key={key} onClick={() => setTab(key)} style={{
+                  background: tab === key ? (key === "swap" ? "var(--accent)" : "var(--surface)") : "transparent",
                   border: "none",
                   borderRadius: 7,
-                  color: tab === t ? "var(--text)" : "var(--muted)",
+                  color: tab === key ? (key === "swap" ? "#000" : "var(--text)") : "var(--muted)",
                   padding: "7px 20px", fontSize: 13,
-                  fontWeight: tab === t ? 700 : 500,
-                  boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                  fontWeight: tab === key ? 700 : 500,
+                  boxShadow: tab === key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
                   transition: "all 0.15s ease",
                   transform: "none",
                 }}>
-                  {t === "overview" ? "Overview" : "Tx History"}
+                  {label}
                 </button>
               ))}
             </div>
 
-            {tab === "history" ? (
+            {tab === "swap" ? (
+              fhevm.provider && fhevm.signer && fhevm.instance ? (
+                <SwapTab
+                  provider={fhevm.provider}
+                  signer={fhevm.signer}
+                  address={fhevm.address}
+                  instance={fhevm.instance}
+                />
+              ) : (
+                <div className="card" style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)", fontSize: 13 }}>
+                  Connect your wallet to use the swap.
+                </div>
+              )
+            ) : tab === "history" ? (
               fhevm.provider && payrollAddress && (
                 <TxHistory
                   provider={fhevm.provider}
