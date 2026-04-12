@@ -93,8 +93,11 @@ export default function App() {
 
   // decrypted salary values + visibility toggles (employee self-view)
   const [mySalaryDecrypted,    setMySalaryDecrypted]    = useState<string | null>(null);
+  const [myPendingDecrypted,   setMyPendingDecrypted]   = useState<string | null>(null);
+  const [myPendingWei,         setMyPendingWei]         = useState<bigint | null>(null);
   const [myTotalPaidDecrypted, setMyTotalPaidDecrypted] = useState<string | null>(null);
   const [showSalary,           setShowSalary]           = useState(false);
+  const [showPending,          setShowPending]          = useState(false);
   const [showTotalPaid,        setShowTotalPaid]        = useState(false);
 
   // per-employee salary decrypt state (employer view)
@@ -157,8 +160,11 @@ export default function App() {
     setWalletBalance(null);
     setContractBalance(null);
     setMySalaryDecrypted(null);
+    setMyPendingDecrypted(null);
+    setMyPendingWei(null);
     setMyTotalPaidDecrypted(null);
     setShowSalary(false);
+    setShowPending(false);
     setShowTotalPaid(false);
     setViewAs("employer");
 
@@ -354,7 +360,8 @@ export default function App() {
       const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(salaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
-      const tx = await contract(true).addEmployee(newEmployee, salaryWei, handles[0], inputProof);
+      // No plaintext salaryWei sent to contract — encrypted-only
+      const tx = await contract(true).addEmployee(newEmployee, handles[0], inputProof);
       await tx.wait();
       setNewEmployee(""); setNewSalary("");
     });
@@ -366,7 +373,8 @@ export default function App() {
       const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(newSalaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
-      const tx = await contract(true).updateSalary(updateTarget, newSalaryWei, handles[0], inputProof);
+      // No plaintext salary sent — encrypted-only
+      const tx = await contract(true).updateSalary(updateTarget, handles[0], inputProof);
       await tx.wait();
       setUpdateTarget(""); setUpdateSalary("");
     });
@@ -481,6 +489,34 @@ export default function App() {
       fail(e instanceof Error ? e.message : "Decryption failed");
     } finally { setBusy(false); }
   };
+
+  const handleDecryptMyPending = async () => {
+    if (!fhevm.instance) return fail("FHEVM instance not ready");
+    setBusy(true); setStatus(null);
+    try {
+      if (!await assertEmployeeRegistered()) return;
+      const handle = await contract(true).getMyPendingBalance();
+      const val = await userDecryptHandle(handle);
+      setMyPendingWei(val);
+      const ethAmt = ethers.formatEther(val);
+      const usd = toUsd(ethAmt);
+      setMyPendingDecrypted(usd ? `${ethAmt} ETH (${usd})` : `${ethAmt} ETH`);
+      setShowPending(true);
+    } catch (e: unknown) {
+      fail(e instanceof Error ? e.message : "Decryption failed");
+    } finally { setBusy(false); }
+  };
+
+  const handleClaimSalary = () =>
+    wrap("Claim salary", async () => {
+      if (!myPendingWei || myPendingWei === 0n) throw new Error("No pending balance to claim. Reveal your pending balance first.");
+      const tx = await contract(true).claimSalary(myPendingWei);
+      await tx.wait();
+      // Reset after successful claim
+      setMyPendingWei(null);
+      setMyPendingDecrypted(null);
+      setShowPending(false);
+    });
 
   // Employer: decrypt a specific employee's salary.
   // Must use contract(true) (signer) so eth_call sets from=employer,
@@ -661,7 +697,7 @@ export default function App() {
               {[
                 { icon: "🏗", title: "Deploy", body: "Employer deploys a private payroll contract owned by their wallet." },
                 { icon: "🔐", title: "Add & Encrypt", body: "Add employees with salaries encrypted client-side before hitting the chain." },
-                { icon: "💰", title: "Pay", body: "ETH is transferred directly. Only the employee can reveal their own salary rate." },
+                { icon: "💰", title: "Pay", body: "Salary is credited to an encrypted on-chain balance — the payment transaction reveals nothing. Employees claim ETH when ready." },
               ].map(s => (
                 <div key={s.title} className="card" style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 28, marginBottom: 12 }}>{s.icon}</div>
@@ -1053,7 +1089,7 @@ export default function App() {
                 {!showEmployerView && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-                  {/* How you receive salary */}
+                  {/* Wallet balance + claim section */}
                   <div className="card" style={{ borderColor: "rgba(255,209,0,0.15)" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--success-dim)", border: "1px solid rgba(74,222,128,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1062,15 +1098,10 @@ export default function App() {
                         </svg>
                       </div>
                       <div style={{ flex: 1 }}>
-                        <h2 style={{ marginBottom: 6 }}>How you receive your salary</h2>
-                        <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 12 }}>
-                          When the employer runs <strong style={{ color: "var(--text)" }}>Pay Salary</strong>, ETH is transferred
-                          directly to your wallet address on-chain — no action needed from you.
-                          Your salary <em>rate</em> is stored encrypted so co-workers cannot see what you earn.
-                        </p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+                        <h2 style={{ marginBottom: 6 }}>My Wallet</h2>
+                        <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap", marginBottom: 10 }}>
                           <div>
-                            <div className="stat-label">Your wallet balance</div>
+                            <div className="stat-label">Wallet balance</div>
                             <div className="stat-value success" style={{ fontSize: 20, marginTop: 4 }}>
                               {walletBalance ?? "—"} ETH
                             </div>
@@ -1078,50 +1109,111 @@ export default function App() {
                               <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>≈ {toUsd(walletBalance)}</div>
                             )}
                           </div>
-                          <div style={{ fontSize: 12, color: "var(--muted)", maxWidth: 280 }}>
-                            Check this address on{" "}
-                            <a href={`https://sepolia.etherscan.io/address/${fhevm.address}`} target="_blank" rel="noreferrer">
-                              Sepolia Etherscan ↗
-                            </a>{" "}
-                            to see incoming salary transactions.
+                          <div style={{ fontSize: 12, color: "var(--muted)", maxWidth: 260, lineHeight: 1.6 }}>
+                            Salary payments accumulate as an encrypted pending balance.
+                            Reveal your pending balance below, then click <strong>Claim</strong> to withdraw ETH.
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Encrypted salary cards */}
+                  {/* Claim pending salary */}
+                  <div className="card" style={{ borderColor: myPendingWei && myPendingWei > 0n ? "rgba(255,209,0,0.35)" : undefined }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD100" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <h2>Pending Salary — Claim ETH</h2>
+                        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                          Decrypt your balance, then withdraw accumulated ETH
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+                      {/* Pending balance display */}
+                      <div style={{ flex: 1, minWidth: 180 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                          Pending Balance (encrypted)
+                        </div>
+                        <div style={{ fontSize: 24, fontWeight: 700, display: "flex", alignItems: "center", gap: 10, minHeight: 34 }}>
+                          {myPendingDecrypted && showPending ? (
+                            <span style={{ color: "var(--accent)" }}>{myPendingDecrypted}</span>
+                          ) : (
+                            <span style={{ color: "var(--muted)", letterSpacing: 5, fontSize: 20 }}>••••••</span>
+                          )}
+                          {myPendingDecrypted && (
+                            <button
+                              onClick={() => setShowPending(v => !v)}
+                              style={{ background: "none", border: "none", padding: "4px", color: "var(--muted)", cursor: "pointer", borderRadius: 4, display: "flex" }}
+                              title={showPending ? "Hide" : "Show"}
+                            >
+                              <EyeIcon off={showPending} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Buttons */}
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <button
+                          className="btn-ghost btn-sm"
+                          onClick={handleDecryptMyPending}
+                          disabled={busy}
+                        >
+                          <LockIcon /> {myPendingDecrypted ? "Refresh Balance" : "Reveal Balance"}
+                        </button>
+                        {myPendingWei !== null && myPendingWei > 0n && (
+                          <button
+                            className="btn-primary"
+                            onClick={handleClaimSalary}
+                            disabled={busy || contractClosed}
+                          >
+                            Claim {ethers.formatEther(myPendingWei)} ETH
+                          </button>
+                        )}
+                        {myPendingWei !== null && myPendingWei === 0n && (
+                          <span style={{ fontSize: 12, color: "var(--muted)" }}>Nothing to claim yet</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <p style={{ marginTop: 14, fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                      <LockIcon /> The salary payment transaction reveals no amount on-chain — only the claim step transfers ETH.
+                    </p>
+                  </div>
+
+                  {/* Encrypted salary info cards */}
                   <div className="card">
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <LockIcon />
                       </div>
                       <div>
-                        <h2>My Encrypted Salary</h2>
+                        <h2>My Encrypted Salary Records</h2>
                         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                          Stored as an FHE ciphertext — only you can decrypt it
+                          Stored as FHE ciphertexts — only you can decrypt
                         </p>
                       </div>
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
 
-                      {/* Monthly salary card */}
+                      {/* Monthly rate */}
                       <div className="card-inner">
                         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
-                          Monthly Salary
+                          Monthly Rate
                         </div>
-
-                        {/* Value display */}
                         <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 14, minHeight: 34, display: "flex", alignItems: "center", gap: 10 }}>
                           {mySalaryDecrypted && showSalary ? (
                             <span style={{ color: "var(--accent)" }}>{mySalaryDecrypted}</span>
-                          ) : mySalaryDecrypted && !showSalary ? (
-                            <span style={{ color: "var(--muted)", letterSpacing: 5, fontSize: 18 }}>••••••</span>
                           ) : (
                             <span style={{ color: "var(--muted)", letterSpacing: 5, fontSize: 18 }}>••••••</span>
                           )}
-                          {/* Reveal / hide toggle — only shown after decryption */}
                           {mySalaryDecrypted && (
                             <button
                               onClick={() => setShowSalary(v => !v)}
@@ -1132,8 +1224,6 @@ export default function App() {
                             </button>
                           )}
                         </div>
-
-                        {/* Action button */}
                         {!mySalaryDecrypted ? (
                           <button className="btn-ghost btn-sm" onClick={handleDecryptMySalary} disabled={busy}>
                             <LockIcon /> Decrypt & Reveal
@@ -1141,19 +1231,16 @@ export default function App() {
                         ) : (
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             <span style={{ fontSize: 11, color: "var(--muted)" }}>/ month</span>
-                            <button className="btn-ghost btn-sm" onClick={handleDecryptMySalary} disabled={busy} style={{ fontSize: 11, padding: "4px 10px" }}>
-                              Refresh
-                            </button>
+                            <button className="btn-ghost btn-sm" onClick={handleDecryptMySalary} disabled={busy} style={{ fontSize: 11, padding: "4px 10px" }}>Refresh</button>
                           </div>
                         )}
                       </div>
 
-                      {/* Total paid card */}
+                      {/* Total paid */}
                       <div className="card-inner">
                         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
                           Total Paid to Date
                         </div>
-
                         <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 14, minHeight: 34, display: "flex", alignItems: "center", gap: 10 }}>
                           {myTotalPaidDecrypted && showTotalPaid ? (
                             <span style={{ color: "var(--success)" }}>{myTotalPaidDecrypted}</span>
@@ -1170,7 +1257,6 @@ export default function App() {
                             </button>
                           )}
                         </div>
-
                         {!myTotalPaidDecrypted ? (
                           <button className="btn-ghost btn-sm" onClick={handleDecryptMyTotalPaid} disabled={busy}>
                             <LockIcon /> Decrypt & Reveal
@@ -1178,9 +1264,7 @@ export default function App() {
                         ) : (
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             <span style={{ fontSize: 11, color: "var(--muted)" }}>total earned</span>
-                            <button className="btn-ghost btn-sm" onClick={handleDecryptMyTotalPaid} disabled={busy} style={{ fontSize: 11, padding: "4px 10px" }}>
-                              Refresh
-                            </button>
+                            <button className="btn-ghost btn-sm" onClick={handleDecryptMyTotalPaid} disabled={busy} style={{ fontSize: 11, padding: "4px 10px" }}>Refresh</button>
                           </div>
                         )}
                       </div>

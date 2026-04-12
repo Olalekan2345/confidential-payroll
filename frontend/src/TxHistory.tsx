@@ -43,6 +43,7 @@ const BADGE: Record<string, { bg: string; color: string; border: string }> = {
   "Employee Added":    { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
   "Salary Updated":   { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" },
   "Salary Paid":      { bg: "#fffbe6", color: "#92400e", border: "rgba(255,210,8,0.4)" },
+  "Salary Claimed":   { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
   "Employee Removed": { bg: "#fef2f2", color: "#dc2626", border: "#fecaca" },
   "Payroll Withdrawn":{ bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
 };
@@ -83,36 +84,39 @@ export function TxHistory({
 
       if (filterAddress) {
         // ── Employee view: only events involving this address ──────────────
-        // Use topic filters so only matching logs are fetched (no client-side scan).
         const addr = filterAddress;
-        const [added, removed, updated, paid] = await Promise.all([
+        const [added, removed, updated, paid, claimed] = await Promise.all([
           queryChunked(c, c.filters.EmployeeAdded(addr),   fromBlock, currentBlock),
           queryChunked(c, c.filters.EmployeeRemoved(addr), fromBlock, currentBlock),
           queryChunked(c, c.filters.SalaryUpdated(addr),   fromBlock, currentBlock),
           queryChunked(c, c.filters.SalaryPaid(addr),      fromBlock, currentBlock),
+          queryChunked(c, c.filters.SalaryClaimed(addr),   fromBlock, currentBlock),
         ]);
 
         all = [
           ...added.map(log => toRow(log as EventLog, "Employee Added", "You were added to payroll")),
           ...removed.map(log => toRow(log as EventLog, "Employee Removed", "You were removed from payroll")),
-          ...updated.map(log => toRow(log as EventLog, "Salary Updated", "Your salary was updated")),
-          ...paid.map(log => {
+          ...updated.map(log => toRow(log as EventLog, "Salary Updated", "Your salary was updated (confidential)")),
+          // SalaryPaid has no amount — fully confidential payment
+          ...paid.map(log => toRow(log as EventLog, "Salary Paid", "Salary credited to your balance (confidential)")),
+          ...claimed.map(log => {
             const e = log as EventLog;
             const amt = e.args[1]
-              ? `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH received`
-              : "Salary received";
-            return toRow(e, "Salary Paid", amt);
+              ? `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH withdrawn`
+              : "ETH withdrawn";
+            return toRow(e, "Salary Claimed", amt);
           }),
         ].sort((a, b) => b.blockNumber - a.blockNumber);
 
       } else {
         // ── Employer view: all events ──────────────────────────────────────
-        const [funded, added, removed, updated, paid, withdrawn] = await Promise.all([
+        const [funded, added, removed, updated, paid, claimed, withdrawn] = await Promise.all([
           queryChunked(c, "PayrollFunded",    fromBlock, currentBlock),
           queryChunked(c, "EmployeeAdded",    fromBlock, currentBlock),
           queryChunked(c, "EmployeeRemoved",  fromBlock, currentBlock),
           queryChunked(c, "SalaryUpdated",    fromBlock, currentBlock),
           queryChunked(c, "SalaryPaid",       fromBlock, currentBlock),
+          queryChunked(c, "SalaryClaimed",    fromBlock, currentBlock),
           queryChunked(c, "PayrollWithdrawn", fromBlock, currentBlock),
         ]);
 
@@ -125,10 +129,12 @@ export function TxHistory({
           ...added.map(log => toRow(log as EventLog, "Employee Added", short((log as EventLog).args[0] as string))),
           ...removed.map(log => toRow(log as EventLog, "Employee Removed", short((log as EventLog).args[0] as string))),
           ...updated.map(log => toRow(log as EventLog, "Salary Updated", short((log as EventLog).args[0] as string))),
-          ...paid.map(log => {
+          // SalaryPaid: no amount (confidential) — show employee address only
+          ...paid.map(log => toRow(log as EventLog, "Salary Paid", `${short((log as EventLog).args[0] as string)} · confidential`)),
+          ...claimed.map(log => {
             const e = log as EventLog;
             const amt = e.args[1] ? ` · ${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH` : "";
-            return toRow(e, "Salary Paid", `${short(e.args[0] as string)}${amt}`);
+            return toRow(e, "Salary Claimed", `${short(e.args[0] as string)}${amt}`);
           }),
           ...withdrawn.map(log => {
             const e = log as EventLog;

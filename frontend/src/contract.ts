@@ -1,8 +1,6 @@
 // ─── Factory ──────────────────────────────────────────────────────────────────
 // One global deployment. Anyone calls create() to deploy their own payroll.
-// Replace FACTORY_ADDRESS with the deployed address after running:
-//   npx hardhat deploy --tags ConfidentialPayrollFactory --network sepolia
-export const FACTORY_ADDRESS = "0xD9AB1aAE8Ca9C1a5023205242FD56583a0E9bbf0";
+export const FACTORY_ADDRESS = "0xF37Bb26297dd2B6B21eCb33dD3C7C7878D2eD7f0";
 
 export const FACTORY_ABI = [
   "function create() returns (address)",
@@ -21,8 +19,9 @@ export const PAYROLL_ABI = [
   // Employer actions
   "function fundPayroll() payable",
   "function closePayroll()",
-  "function addEmployee(address employee, uint256 salaryWei, bytes32 encSalary, bytes calldata inputProof)",
-  "function updateSalary(address employee, uint256 newSalaryWei, bytes32 encNewSalary, bytes calldata inputProof)",
+  // No plaintext salary — salary is encrypted-only
+  "function addEmployee(address employee, bytes32 encSalary, bytes calldata inputProof)",
+  "function updateSalary(address employee, bytes32 encNewSalary, bytes calldata inputProof)",
   "function removeEmployee(address employee)",
   "function paySalary(address employee)",
   "function payAll()",
@@ -30,7 +29,11 @@ export const PAYROLL_ABI = [
 
   // Employee reads
   "function getMySalary() view returns (bytes32)",
+  "function getMyPendingBalance() view returns (bytes32)",
   "function getMyTotalPaid() view returns (bytes32)",
+
+  // Employee action — claim accumulated ETH salary
+  "function claimSalary(uint64 amountWei)",
 
   // Shared reads
   "function getEmployeeList() view returns (address[])",
@@ -38,13 +41,16 @@ export const PAYROLL_ABI = [
 
   // Employer reads
   "function getEmployeeSalary(address employee) view returns (bytes32)",
+  "function getEmployeePendingBalance(address employee) view returns (bytes32)",
 
   // Events
   "event EmployeeAdded(address indexed employee)",
   "event EmployeeRemoved(address indexed employee)",
   "event SalaryUpdated(address indexed employee)",
   "event PayrollFunded(address indexed funder, uint256 amount)",
-  "event SalaryPaid(address indexed employee, uint256 amount, uint256 timestamp)",
+  // SalaryPaid has NO amount — confidential payment
+  "event SalaryPaid(address indexed employee, uint256 timestamp)",
+  "event SalaryClaimed(address indexed employee, uint256 amount)",
   "event PayrollWithdrawn(address indexed employer, uint256 amount)",
   "event PayrollClosed(address indexed employer, uint256 refunded)",
 ] as const;
