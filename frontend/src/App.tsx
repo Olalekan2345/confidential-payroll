@@ -499,31 +499,34 @@ export default function App() {
 
       {/* ── Top nav bar ── */}
       <header style={{
-        borderBottom: "1px solid var(--border)",
-        background: "rgba(10,10,10,0.9)",
-        backdropFilter: "blur(12px)",
+        borderBottom: "1.5px solid var(--border)",
+        background: "rgba(255,255,255,0.85)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
         position: "sticky", top: 0, zIndex: 50,
+        boxShadow: "0 1px 0 rgba(0,0,0,0.06)",
       }}>
-        <div style={{ maxWidth: 980, margin: "0 auto", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <LockIcon />
+        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* ZecurePay logo mark */}
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(255,210,8,0.4)", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
             </div>
-            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.2px" }}>ConfidentialPayroll</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", background: "var(--accent-dim)", padding: "2px 7px", borderRadius: 4, border: "1px solid rgba(255,209,0,0.2)", letterSpacing: "0.05em" }}>
-              FHEVM
-            </span>
+            <span style={{ fontFamily: "var(--font-heading)", fontWeight: 400, fontSize: 18, letterSpacing: "-0.3px", color: "var(--text)" }}>ZecurePay</span>
+            <span className="pill-accent">FHEVM</span>
           </div>
           {fhevm.address ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 9999, padding: "5px 12px" }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--bg-alt)", border: "1.5px solid var(--border)", borderRadius: 9999, padding: "5px 14px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#16a34a", flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: "var(--text-2)", fontFamily: "monospace" }}>{short(fhevm.address)}</span>
                 {walletBalance && (
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>
-                      {walletBalance} ETH{toUsd(walletBalance) ? ` · ${toUsd(walletBalance)}` : ""}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
+                    {walletBalance} ETH{toUsd(walletBalance) ? <span style={{ color: "var(--muted)", fontWeight: 400 }}> · {toUsd(walletBalance)}</span> : ""}
+                  </span>
+                )}
               </div>
               <span className={`tag ${fhevm.isEmployer ? "tag-active" : "tag-encrypted"}`}>
                 {fhevm.isEmployer ? "Employer" : "Employee"}
@@ -557,29 +560,60 @@ export default function App() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 980, margin: "0 auto", padding: "32px 24px 64px" }}>
+      <main style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 28px 80px" }}>
 
         {/* ── Main render switch ── */}
         {!fhevm.address ? (
-          /* Not connected */
-          <div style={{ textAlign: "center", padding: "80px 0" }}>
-            <div style={{ width: 60, height: 60, borderRadius: 16, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFD100" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0110 0v4"/>
-              </svg>
+          /* Not connected — hero */
+          <div style={{ textAlign: "center", padding: "72px 0 80px" }}>
+            {/* Logo mark */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
+              <div style={{ width: 80, height: 80, borderRadius: 22, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 32px rgba(255,210,8,0.35)" }}>
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
             </div>
-            <h1 style={{ marginBottom: 10 }}>Confidential Payroll</h1>
-            <p style={{ color: "var(--text-2)", marginBottom: 32, maxWidth: 420, margin: "0 auto 32px", lineHeight: 1.7 }}>
-              On-chain payroll where salary rates are fully encrypted using{" "}
-              <a href="https://zama.ai" target="_blank" rel="noreferrer">Zama FHEVM</a>.
-              Only you can see what you earn.
+
+            <div style={{ marginBottom: 12 }}>
+              <span className="pill-accent" style={{ marginBottom: 16, display: "inline-flex" }}>Powered by Zama FHEVM</span>
+            </div>
+
+            <h1 style={{ fontSize: 48, marginBottom: 16, lineHeight: 1.15 }}>
+              <span className="gradient-text">ZecurePay</span>
+            </h1>
+            <p style={{ color: "var(--text-2)", maxWidth: 480, margin: "0 auto 16px", lineHeight: 1.8, fontSize: 15 }}>
+              The first fully confidential on-chain payroll. Salary rates are encrypted using
+              homomorphic encryption — no one can see what your employees earn.
             </p>
-            <button className="btn-primary" onClick={fhevm.connect} disabled={fhevm.loading} style={{ padding: "11px 28px", fontSize: 14 }}>
-              {fhevm.loading ? "Initializing FHE engine…" : "Connect MetaMask"}
+
+            {/* Feature pills */}
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginBottom: 40 }}>
+              {["🔒 FHE-encrypted salaries", "⛓ Sepolia testnet", "💸 Real ETH transfers", "👁 Only you can decrypt"].map(f => (
+                <span key={f} style={{ fontSize: 12, fontWeight: 500, color: "var(--text-2)", background: "var(--surface)", border: "1.5px solid var(--border)", padding: "5px 14px", borderRadius: 9999, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>{f}</span>
+              ))}
+            </div>
+
+            <button className="btn-primary" onClick={fhevm.connect} disabled={fhevm.loading} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 10 }}>
+              {fhevm.loading ? "Initializing FHE engine…" : "Connect MetaMask to Get Started"}
             </button>
-            {fhevm.loading && <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted)" }}>Loading WASM modules — takes ~10s on first visit</p>}
+            {fhevm.loading && <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted)" }}>Loading WASM cryptography modules — takes ~10 s on first visit</p>}
             {fhevm.error && <p style={{ color: "var(--danger)", marginTop: 12, fontSize: 13 }}>{fhevm.error}</p>}
+
+            {/* How it works strip */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, maxWidth: 700, margin: "56px auto 0", textAlign: "left" }}>
+              {[
+                { icon: "🏗", title: "Deploy", body: "Employer deploys a private payroll contract owned by their wallet." },
+                { icon: "🔐", title: "Add & Encrypt", body: "Add employees with salaries encrypted client-side before hitting the chain." },
+                { icon: "💰", title: "Pay", body: "ETH is transferred directly. Only the employee can reveal their own salary rate." },
+              ].map(s => (
+                <div key={s.title} className="card" style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{s.icon}</div>
+                  <div style={{ fontFamily: "var(--font-heading)", fontWeight: 400, fontSize: 15, marginBottom: 6 }}>{s.title}</div>
+                  <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.7 }}>{s.body}</p>
+                </div>
+              ))}
+            </div>
           </div>
         ) : setupPhase === "checking" ? (
           /* Checking factory */
@@ -611,8 +645,8 @@ export default function App() {
                 </div>
               </div>
               <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 16 }}>
-                Creates a fresh <strong style={{ color: "var(--text)" }}>ConfidentialPayroll</strong> contract
-                owned by your wallet. You pay a small one-time gas fee (~0.001 ETH) to deploy it.
+                Creates a fresh <strong style={{ color: "var(--text)" }}>ZecurePay</strong> contract
+                owned by your wallet. One-time gas fee (~0.001 ETH). Salary data stays private forever.
               </p>
               <button className="btn-primary" onClick={handleDeploy} disabled={deploying} style={{ justifyContent: "center", width: "100%" }}>
                 {deploying ? "Deploying…" : "Deploy My Payroll Contract"}
@@ -695,15 +729,18 @@ export default function App() {
             )}
 
             {/* ── Tab bar ── */}
-            <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: 28 }}>
+            <div style={{ display: "flex", gap: 4, background: "var(--bg-alt)", border: "1.5px solid var(--border)", borderRadius: 10, padding: 4, marginBottom: 28, width: "fit-content" }}>
               {(["overview", "history"] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{
-                  background: "none", border: "none", borderRadius: 0,
-                  borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`,
+                  background: tab === t ? "var(--surface)" : "transparent",
+                  border: "none",
+                  borderRadius: 7,
                   color: tab === t ? "var(--text)" : "var(--muted)",
-                  padding: "10px 18px", fontSize: 13,
-                  fontWeight: tab === t ? 600 : 400,
-                  marginBottom: -1, cursor: "pointer", transition: "color 0.15s",
+                  padding: "7px 20px", fontSize: 13,
+                  fontWeight: tab === t ? 700 : 500,
+                  boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s ease",
+                  transform: "none",
                 }}>
                   {t === "overview" ? "Overview" : "Tx History"}
                 </button>
@@ -1103,31 +1140,38 @@ export default function App() {
       </main>
 
       {/* ── Footer ── */}
-      {fhevm.address && (
-        <footer style={{ borderTop: "1px solid var(--border)", padding: "16px 24px", display: "flex", justifyContent: "center", gap: 24, fontSize: 12, color: "var(--muted)" }}>
-          {payrollAddress && <>
-            <span>Contract: <code>{short(payrollAddress)}</code></span>
-            <span>·</span>
-            <a href={`https://sepolia.etherscan.io/address/${payrollAddress}`} target="_blank" rel="noreferrer">View on Etherscan ↗</a>
-            <span>·</span>
-            {showEmployerView && (
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => {
-                  const url = `${window.location.origin}${window.location.pathname}?payroll=${payrollAddress}`;
-                  navigator.clipboard.writeText(url);
-                  ok("Employee link copied to clipboard!");
-                }}
-                style={{ fontSize: 11, padding: "3px 10px" }}
-              >
-                Copy Employee Link
-              </button>
-            )}
-            <span>·</span>
-          </>}
-          <span>Powered by <a href="https://zama.ai" target="_blank" rel="noreferrer">Zama FHEVM</a></span>
-        </footer>
-      )}
+      <footer style={{ borderTop: "1.5px solid var(--border)", background: "var(--bg-alt)", padding: "20px 28px" }}>
+        <div style={{ maxWidth: 1040, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 22, height: 22, borderRadius: 6, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <span style={{ fontFamily: "var(--font-heading)", fontSize: 14, color: "var(--text)" }}>ZecurePay</span>
+            <span style={{ color: "var(--muted)", fontSize: 12 }}>· Powered by <a href="https://zama.ai" target="_blank" rel="noreferrer" style={{ color: "var(--text-2)", borderBottomColor: "var(--border)" }}>Zama FHEVM</a></span>
+          </div>
+          {payrollAddress && (
+            <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "var(--muted)" }}>
+              <span>Contract: <code>{short(payrollAddress)}</code></span>
+              <a href={`https://sepolia.etherscan.io/address/${payrollAddress}`} target="_blank" rel="noreferrer" style={{ color: "var(--text-2)", borderBottomColor: "var(--border)" }}>Etherscan ↗</a>
+              {showEmployerView && (
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}?payroll=${payrollAddress}`;
+                    navigator.clipboard.writeText(url);
+                    ok("Employee link copied to clipboard!");
+                  }}
+                  style={{ fontSize: 11 }}
+                >
+                  Share Employee Link
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }

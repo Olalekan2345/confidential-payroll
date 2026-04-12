@@ -1,52 +1,94 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Varela+Round&family=Archivo:wght@300;400;500;600;700&display=swap');
 
+/* ── Design tokens ────────────────────────────────────────────────────────── */
 :root {
-  --bg:           #0a0a0a;
-  --surface:      #111111;
-  --surface-2:    #181818;
-  --border:       #222222;
-  --border-light: #2a2a2a;
-  --accent:       #FFD100;
-  --accent-dim:   #2a2200;
-  --accent-hover: #F5C800;
-  --accent-text:  #0a0a0a;
-  --success:      #4ade80;
-  --success-dim:  #0f2e1a;
-  --danger:       #f87171;
-  --danger-dim:   #2d0f0f;
-  --text:         #f0f0f0;
-  --text-2:       #a0a0a0;
-  --muted:        #555555;
+  --bg:           #ffffff;
+  --bg-alt:       #f9fafb;
+  --surface:      #ffffff;
+  --surface-2:    #f3f4f6;
+  --border:       #e5e7eb;
+  --border-light: #f0f0f0;
+  --accent:       #FFD208;
+  --accent-dim:   #fffbe6;
+  --accent-hover: #f5c800;
+  --accent-text:  #000000;
+  --success:      #16a34a;
+  --success-dim:  #f0fdf4;
+  --danger:       #dc2626;
+  --danger-dim:   #fef2f2;
+  --text:         #111111;
+  --text-2:       #374151;
+  --muted:        #6b7280;
   --radius-sm:    6px;
-  --radius:       10px;
-  --radius-lg:    14px;
-  --font:         'Inter', system-ui, sans-serif;
-  --shadow:       0 1px 3px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
-  --shadow-lg:    0 4px 24px rgba(0,0,0,0.6);
+  --radius:       12px;
+  --radius-lg:    18px;
+  --font:         'Archivo', system-ui, sans-serif;
+  --font-heading: 'Varela Round', system-ui, sans-serif;
+  --shadow:       0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.10);
+  --shadow-accent:0 4px 24px rgba(255,210,8,0.25);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
 
+/* Animated gradient background — Zama signature effect */
 body {
-  background: var(--bg);
+  background: #ffffff;
+  background-image: radial-gradient(ellipse at 0% 0%, #f5e6ff 0%, transparent 50%),
+                    radial-gradient(ellipse at 100% 0%, #e6f3ff 0%, transparent 50%),
+                    radial-gradient(ellipse at 100% 100%, #fff8e1 0%, transparent 50%),
+                    radial-gradient(ellipse at 0% 100%, #f0e6ff 0%, transparent 50%);
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease-in-out infinite alternate;
   color: var(--text);
   font-family: var(--font);
   min-height: 100vh;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
+@keyframes gradientShift {
+  0%   { background-position: 0% 0%; }
+  33%  { background-position: 100% 0%; }
+  66%  { background-position: 100% 100%; }
+  100% { background-position: 0% 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
+  button, .btn-primary, .btn-ghost, .btn-danger { transition: none !important; }
+}
+
 /* ── Typography ─────────────────────────────────────────────────────────── */
-h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
-h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
-h3 { font-size: 13px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; }
+h1 {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  color: var(--text);
+}
+h2 {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.1px;
+  color: var(--text);
+}
+h3 {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 
 code {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: 'SF Mono', 'Fira Code', Consolas, Monaco, monospace;
   font-size: 12px;
+  line-height: 2;
   background: var(--surface-2);
   border: 1px solid var(--border);
   padding: 2px 7px;
@@ -54,72 +96,111 @@ code {
   color: var(--text-2);
 }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); transition: border-color 0.15s; }
+a:hover { border-color: var(--accent); }
 
 label {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-2);
   margin-bottom: 6px;
   display: block;
   letter-spacing: 0.02em;
 }
 
-/* ── Buttons ────────────────────────────────────────────────────────────── */
+/* ── Buttons — Zama corner-tab style ────────────────────────────────────── */
 button {
   cursor: pointer;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 9px 16px;
+  padding: 10px 20px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--font);
-  transition: all 0.15s ease;
-  letter-spacing: 0.01em;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  letter-spacing: 0.02em;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
 
-button:disabled { opacity: 0.38; cursor: not-allowed; }
+/* Animated corner tab — Zama signature */
+button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  background: rgba(0,0,0,0.12);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  transform: scale(1);
+  transform-origin: top left;
+  transition: transform 0.16s ease;
+}
+button:hover:not(:disabled)::before {
+  transform: scale(0.5);
+}
+
+button:hover:not(:disabled) {
+  transform: scale(1.03);
+}
+
+button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none !important;
+}
 
 .btn-primary {
   background: var(--accent);
   color: var(--accent-text);
+  box-shadow: 0 2px 8px rgba(255,210,8,0.3);
 }
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-accent);
+}
 
 .btn-ghost {
   background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--border-light);
+  color: var(--text);
+  border: 1.5px solid var(--border);
 }
 .btn-ghost:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent-dim);
+  color: var(--accent-text);
 }
 
 .btn-danger {
   background: transparent;
   color: var(--danger);
-  border: 1px solid var(--border-light);
+  border: 1.5px solid var(--border);
 }
 .btn-danger:hover:not(:disabled) {
   border-color: var(--danger);
   background: var(--danger-dim);
 }
 
-.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* No corner tab on small buttons — too cramped */
+.btn-sm::before { display: none; }
 
 /* ── Inputs ─────────────────────────────────────────────────────────────── */
 input, select {
-  background: var(--bg);
-  border: 1px solid var(--border-light);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  padding: 9px 13px;
+  padding: 10px 14px;
   font-size: 13px;
   font-family: var(--font);
   width: 100%;
@@ -129,29 +210,40 @@ input, select {
 input::placeholder { color: var(--muted); }
 input:focus, select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.08);
+  box-shadow: 0 0 0 3px rgba(255,210,8,0.12);
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-lg);
 }
 
 .card-inner {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 14px 16px;
+  padding: 16px 18px;
 }
 
 /* ── Stat chip ──────────────────────────────────────────────────────────── */
 .stat { display: flex; flex-direction: column; gap: 4px; }
-.stat-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
-.stat-value { font-size: 16px; font-weight: 700; color: var(--text); }
-.stat-value.accent { color: var(--accent); }
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.stat-value { font-size: 20px; font-weight: 700; color: var(--text); font-family: var(--font-heading); }
+.stat-value.accent { color: #92400e; }
 .stat-value.success { color: var(--success); }
 
 /* ── Tags / badges ──────────────────────────────────────────────────────── */
@@ -159,27 +251,26 @@ input:focus, select:focus {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: 9999px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
-
-.tag-active   { background: var(--success-dim); color: var(--success); }
-.tag-inactive { background: var(--danger-dim);  color: var(--danger); }
+.tag-active   { background: #dcfce7; color: var(--success); border: 1px solid #bbf7d0; }
+.tag-inactive { background: var(--danger-dim); color: var(--danger); border: 1px solid #fecaca; }
 .tag-encrypted {
   background: var(--accent-dim);
-  color: var(--accent);
-  border: 1px solid rgba(255,209,0,0.15);
+  color: #92400e;
+  border: 1px solid rgba(255,210,8,0.4);
 }
 
 /* ── Divider ────────────────────────────────────────────────────────────── */
 .divider {
   border: none;
-  border-top: 1px solid var(--border);
-  margin: 16px 0;
+  border-top: 1.5px solid var(--border);
+  margin: 18px 0;
 }
 
 /* ── Checkbox ───────────────────────────────────────────────────────────── */
@@ -193,7 +284,60 @@ input[type="checkbox"] {
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-alt); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Hero gradient text ─────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #111111 0%, #6b21a8 50%, #FFD208 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Accent pill ────────────────────────────────────────────────────────── */
+.pill-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(255,210,8,0.4);
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+/* ── Nav link ───────────────────────────────────────────────────────────── */
+.nav-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  border: none;
+  padding: 4px 0;
+  position: relative;
+  transition: color 0.15s;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+.nav-link:hover, .nav-link.active {
+  color: var(--text);
+  border-bottom-color: transparent;
+}
+.nav-link:hover::after, .nav-link.active::after {
+  transform: scaleX(1);
+}

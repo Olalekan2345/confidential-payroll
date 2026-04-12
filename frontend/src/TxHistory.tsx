@@ -38,13 +38,13 @@ type TxRow = {
 
 const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
-const BADGE: Record<string, { bg: string; color: string }> = {
-  "Payroll Funded":    { bg: "#2a2200", color: "#FFD100" },
-  "Employee Added":    { bg: "#1a2e0f", color: "#4ade80" },
-  "Salary Updated":   { bg: "#1e1e2e", color: "#a5b4fc" },
-  "Salary Paid":      { bg: "#2a2200", color: "#FFD100" },
-  "Employee Removed": { bg: "#2d0f0f", color: "#f87171" },
-  "Payroll Withdrawn":{ bg: "#2a1500", color: "#fb923c" },
+const BADGE: Record<string, { bg: string; color: string; border: string }> = {
+  "Payroll Funded":    { bg: "#fffbe6", color: "#92400e", border: "rgba(255,210,8,0.4)" },
+  "Employee Added":    { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+  "Salary Updated":   { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" },
+  "Salary Paid":      { bg: "#fffbe6", color: "#92400e", border: "rgba(255,210,8,0.4)" },
+  "Employee Removed": { bg: "#fef2f2", color: "#dc2626", border: "#fecaca" },
+  "Payroll Withdrawn":{ bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -223,12 +223,12 @@ export function TxHistory({
       {!loading && rows.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {rows.map(row => {
-            const badge = BADGE[row.label] ?? { bg: "#1e293b", color: "var(--muted)" };
+            const badge = BADGE[row.label] ?? { bg: "var(--bg-alt)", color: "var(--muted)", border: "var(--border)" };
             return (
               <div
                 key={row.id}
                 className="card"
-                style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 16px" }}
+                style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 18px" }}
               >
                 <span style={{
                   padding: "3px 10px",
@@ -238,6 +238,7 @@ export function TxHistory({
                   letterSpacing: "0.04em",
                   background: badge.bg,
                   color: badge.color,
+                  border: `1px solid ${badge.border}`,
                   whiteSpace: "nowrap",
                   flexShrink: 0,
                 }}>
