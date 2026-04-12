@@ -29,10 +29,34 @@
   --shadow-accent:0 4px 24px rgba(255,210,8,0.25);
 }
 
+/* ── Dark mode tokens ─────────────────────────────────────────────────────── */
+.dark {
+  --bg:           #0a0a0a;
+  --bg-alt:       #111111;
+  --surface:      #141414;
+  --surface-2:    #1a1a1a;
+  --border:       #2a2a2a;
+  --border-light: #222222;
+  --accent:       #FFD208;
+  --accent-dim:   #2a2200;
+  --accent-hover: #f5c800;
+  --accent-text:  #000000;
+  --success:      #4ade80;
+  --success-dim:  #0f2e1a;
+  --danger:       #f87171;
+  --danger-dim:   #2d0f0f;
+  --text:         #f0f0f0;
+  --text-2:       #a0a0a0;
+  --muted:        #555555;
+  --shadow:       0 1px 3px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.6);
+  --shadow-accent:0 4px 24px rgba(255,210,8,0.2);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
-/* Animated gradient background — Zama signature effect */
+/* Animated gradient background — light mode */
 body {
   background: #ffffff;
   background-image: radial-gradient(ellipse at 0% 0%, #f5e6ff 0%, transparent 50%),
@@ -47,6 +71,16 @@ body {
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode background — deep with subtle warm gradient */
+body.dark {
+  background: #0a0a0a;
+  background-image: radial-gradient(ellipse at 0% 0%, #1a0a2e 0%, transparent 50%),
+                    radial-gradient(ellipse at 100% 0%, #0a1628 0%, transparent 50%),
+                    radial-gradient(ellipse at 100% 100%, #1a1400 0%, transparent 50%),
+                    radial-gradient(ellipse at 0% 100%, #150a20 0%, transparent 50%);
 }
 
 @keyframes gradientShift {
@@ -220,7 +254,7 @@ input:focus, select:focus {
   border-radius: var(--radius);
   padding: 24px;
   box-shadow: var(--shadow);
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, background 0.3s ease, border-color 0.3s ease;
 }
 .card:hover {
   box-shadow: var(--shadow-lg);
