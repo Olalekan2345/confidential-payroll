@@ -518,7 +518,7 @@ export default function App() {
       {/* ── Top nav bar ── */}
       <header style={{
         borderBottom: "1.5px solid var(--border)",
-        background: "rgba(255,255,255,0.85)",
+        background: dark ? "rgba(20,20,20,0.85)" : "rgba(255,255,255,0.85)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         position: "sticky", top: 0, zIndex: 50,
