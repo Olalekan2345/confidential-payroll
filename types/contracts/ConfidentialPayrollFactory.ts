@@ -25,7 +25,13 @@ import type {
 
 export interface ConfidentialPayrollFactoryInterface extends Interface {
   getFunction(
-    nameOrSignature: "allPayrolls" | "create" | "totalPayrolls" | "userPayroll"
+    nameOrSignature:
+      | "allPayrolls"
+      | "confUsdcAddress"
+      | "confUsdtAddress"
+      | "create"
+      | "totalPayrolls"
+      | "userPayroll"
   ): FunctionFragment;
 
   getEvent(nameOrSignatureOrTopic: "PayrollCreated"): EventFragment;
@@ -33,6 +39,14 @@ export interface ConfidentialPayrollFactoryInterface extends Interface {
   encodeFunctionData(
     functionFragment: "allPayrolls",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "confUsdcAddress",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "confUsdtAddress",
+    values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "create", values?: undefined): string;
   encodeFunctionData(
@@ -46,6 +60,14 @@ export interface ConfidentialPayrollFactoryInterface extends Interface {
 
   decodeFunctionResult(
     functionFragment: "allPayrolls",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "confUsdcAddress",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "confUsdtAddress",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "create", data: BytesLike): Result;
@@ -117,6 +139,10 @@ export interface ConfidentialPayrollFactory extends BaseContract {
 
   allPayrolls: TypedContractMethod<[arg0: BigNumberish], [string], "view">;
 
+  confUsdcAddress: TypedContractMethod<[], [string], "view">;
+
+  confUsdtAddress: TypedContractMethod<[], [string], "view">;
+
   create: TypedContractMethod<[], [string], "nonpayable">;
 
   totalPayrolls: TypedContractMethod<[], [bigint], "view">;
@@ -130,6 +156,12 @@ export interface ConfidentialPayrollFactory extends BaseContract {
   getFunction(
     nameOrSignature: "allPayrolls"
   ): TypedContractMethod<[arg0: BigNumberish], [string], "view">;
+  getFunction(
+    nameOrSignature: "confUsdcAddress"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "confUsdtAddress"
+  ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "create"
   ): TypedContractMethod<[], [string], "nonpayable">;

@@ -3,6 +3,8 @@
 /* eslint-disable */
 import type * as fhevm from "./@fhevm";
 export type { fhevm };
+import type * as openzeppelin from "./@openzeppelin";
+export type { openzeppelin };
 import type * as contracts from "./contracts";
 export type { contracts };
 export * as factories from "./factories";
@@ -22,7 +24,25 @@ export type { IFHEVMExecutor } from "./@fhevm/solidity/lib/Impl.sol/IFHEVMExecut
 export { IFHEVMExecutor__factory } from "./factories/@fhevm/solidity/lib/Impl.sol/IFHEVMExecutor__factory";
 export type { IInputVerifier } from "./@fhevm/solidity/lib/Impl.sol/IInputVerifier";
 export { IInputVerifier__factory } from "./factories/@fhevm/solidity/lib/Impl.sol/IInputVerifier__factory";
+export type { IERC1155Errors } from "./@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC1155Errors";
+export { IERC1155Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC1155Errors__factory";
+export type { IERC20Errors } from "./@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC20Errors";
+export { IERC20Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC20Errors__factory";
+export type { IERC721Errors } from "./@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC721Errors";
+export { IERC721Errors__factory } from "./factories/@openzeppelin/contracts/interfaces/draft-IERC6093.sol/IERC721Errors__factory";
+export type { ERC20 } from "./@openzeppelin/contracts/token/ERC20/ERC20";
+export { ERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/ERC20__factory";
+export type { IERC20Metadata } from "./@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata";
+export { IERC20Metadata__factory } from "./factories/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata__factory";
+export type { IERC20 } from "./@openzeppelin/contracts/token/ERC20/IERC20";
+export { IERC20__factory } from "./factories/@openzeppelin/contracts/token/ERC20/IERC20__factory";
+export type { ConfidentialERC20Wrapper } from "./contracts/ConfidentialERC20Wrapper";
+export { ConfidentialERC20Wrapper__factory } from "./factories/contracts/ConfidentialERC20Wrapper__factory";
 export type { ConfidentialPayroll } from "./contracts/ConfidentialPayroll";
 export { ConfidentialPayroll__factory } from "./factories/contracts/ConfidentialPayroll__factory";
 export type { ConfidentialPayrollFactory } from "./contracts/ConfidentialPayrollFactory";
 export { ConfidentialPayrollFactory__factory } from "./factories/contracts/ConfidentialPayrollFactory__factory";
+export type { IConfidentialERC20 } from "./contracts/IConfidentialERC20";
+export { IConfidentialERC20__factory } from "./factories/contracts/IConfidentialERC20__factory";
+export type { MockERC20 } from "./contracts/MockERC20";
+export { MockERC20__factory } from "./factories/contracts/MockERC20__factory";

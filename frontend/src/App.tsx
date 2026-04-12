@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { Contract, ethers } from "ethers";
-import { FACTORY_ADDRESS, FACTORY_ABI, PAYROLL_ABI } from "./contract";
+import {
+  FACTORY_ADDRESS, FACTORY_ABI, PAYROLL_ABI,
+  CONF_ERC20_ABI, CONF_USDC_ADDRESS, CONF_USDT_ADDRESS,
+  SALARY_TOKEN_LABEL, SUPPORTED_TOKENS,
+} from "./contract";
 import { useFhevm } from "./useFhevm";
 import { TxHistory } from "./TxHistory";
 import { SwapTab } from "./SwapTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EmployeeRow = { address: string; active: boolean; lastPaidAt: number };
+type EmployeeRow = { address: string; active: boolean; lastPaidAt: number; salaryToken: number };
 type StatusMsg   = { text: string; ok: boolean };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,12 +89,20 @@ export default function App() {
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
 
   // form fields
-  const [newEmployee,  setNewEmployee]  = useState("");
-  const [newSalary,    setNewSalary]    = useState("");
-  const [fundAmount,   setFundAmount]   = useState("");
-  const [withdrawAmt,  setWithdrawAmt]  = useState("");
-  const [updateTarget, setUpdateTarget] = useState("");
-  const [updateSalary, setUpdateSalary] = useState("");
+  const [newEmployee,    setNewEmployee]    = useState("");
+  const [newSalary,      setNewSalary]      = useState("");
+  const [newSalaryToken, setNewSalaryToken] = useState<number>(0); // 0=ETH,1=cUSDC,2=cUSDT
+  const [fundAmount,     setFundAmount]     = useState("");
+  const [withdrawAmt,    setWithdrawAmt]    = useState("");
+
+  // inline per-row update form
+  const [inlineUpdateAddr,   setInlineUpdateAddr]   = useState<string | null>(null);
+  const [inlineUpdateSalary, setInlineUpdateSalary] = useState("");
+  const [inlineUpdateToken,  setInlineUpdateToken]  = useState<number>(0);
+
+  // operator approval state
+  const [operatorApproved, setOperatorApproved] = useState<Record<string, boolean>>({});
+  const [approvingOp,      setApprovingOp]      = useState<Record<string, boolean>>({});
 
   // decrypted salary values + visibility toggles (employee self-view)
   const [mySalaryDecrypted,    setMySalaryDecrypted]    = useState<string | null>(null);
@@ -185,6 +197,7 @@ export default function App() {
     loadEmployerAddr();
     loadEmployees();
     loadBalances();
+    checkOperatorApprovals();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payrollAddress]);
 
@@ -275,14 +288,45 @@ export default function App() {
       const list: string[] = await contract().getEmployeeList();
       const rows = await Promise.all(
         list.map(async (addr) => {
-          const [active, lastPaidAt] = await contract().getEmployeeInfo(addr);
-          return { address: addr, active: active as boolean, lastPaidAt: Number(lastPaidAt) };
+          const [active, lastPaidAt, salaryToken] = await contract().getEmployeeInfo(addr);
+          return { address: addr, active: active as boolean, lastPaidAt: Number(lastPaidAt), salaryToken: Number(salaryToken) };
         })
       );
       setEmployees(rows);
     } catch (e) {
       console.error("loadEmployees failed:", e);
       setEmployees([]);
+    }
+  };
+
+  // Check if employer has approved this payroll as operator for cUSDC/cUSDT
+  const checkOperatorApprovals = async () => {
+    if (!fhevm.provider || !fhevm.address || !payrollAddress) return;
+    try {
+      const cUsdc = new Contract(CONF_USDC_ADDRESS, CONF_ERC20_ABI, fhevm.provider);
+      const cUsdt = new Contract(CONF_USDT_ADDRESS, CONF_ERC20_ABI, fhevm.provider);
+      const [approvedUsdc, approvedUsdt] = await Promise.all([
+        cUsdc.isOperatorApproved(payrollAddress, fhevm.address),
+        cUsdt.isOperatorApproved(payrollAddress, fhevm.address),
+      ]);
+      setOperatorApproved({ cUSDC: approvedUsdc as boolean, cUSDT: approvedUsdt as boolean });
+    } catch { /* ignore */ }
+  };
+
+  const handleApproveOperator = async (tokenSymbol: "cUSDC" | "cUSDT") => {
+    if (!fhevm.signer) return;
+    setApprovingOp(prev => ({ ...prev, [tokenSymbol]: true }));
+    try {
+      const addr = tokenSymbol === "cUSDC" ? CONF_USDC_ADDRESS : CONF_USDT_ADDRESS;
+      const cToken = new Contract(addr, CONF_ERC20_ABI, fhevm.signer);
+      const tx = await cToken.approveOperator(payrollAddress, true);
+      await tx.wait();
+      setOperatorApproved(prev => ({ ...prev, [tokenSymbol]: true }));
+      ok(`Payroll contract approved to pay salaries in ${tokenSymbol}.`);
+    } catch (e) {
+      fail(e instanceof Error ? e.message : "Approval failed");
+    } finally {
+      setApprovingOp(prev => ({ ...prev, [tokenSymbol]: false }));
     }
   };
 
@@ -348,28 +392,37 @@ export default function App() {
     setViewAs("employer");
   };
 
+  // Convert salary input to wei based on token type
+  // ETH uses 18 decimals; cUSDC/cUSDT use 6 decimals
+  const parseSalaryAmount = (amount: string, token: number): bigint => {
+    if (token === 0) return ethers.parseEther(amount);
+    return ethers.parseUnits(amount, 6);
+  };
+
   const handleAddEmployee = () =>
     wrap("Add employee", async () => {
       if (!fhevm.instance) throw new Error("FHEVM instance not ready");
-      const salaryWei = ethers.parseEther(newSalary);
+      const salaryWei = parseSalaryAmount(newSalary, newSalaryToken);
       const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(salaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
-      const tx = await contract(true).addEmployee(newEmployee, salaryWei, handles[0], inputProof);
+      const plainWei = newSalaryToken === 0 ? salaryWei : 0n;
+      const tx = await contract(true).addEmployee(newEmployee, newSalaryToken, plainWei, handles[0], inputProof);
       await tx.wait();
       setNewEmployee(""); setNewSalary("");
     });
 
-  const handleUpdateSalary = () =>
+  const handleInlineUpdate = (addr: string) =>
     wrap("Update salary", async () => {
       if (!fhevm.instance) throw new Error("FHEVM instance not ready");
-      const newSalaryWei = ethers.parseEther(updateSalary);
+      const salaryWei = parseSalaryAmount(inlineUpdateSalary, inlineUpdateToken);
       const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
-      const zkProof = input.add64(newSalaryWei).generateZKProof();
+      const zkProof = input.add64(salaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
-      const tx = await contract(true).updateSalary(updateTarget, newSalaryWei, handles[0], inputProof);
+      const plainWei = inlineUpdateToken === 0 ? salaryWei : 0n;
+      const tx = await contract(true).updateSalary(addr, inlineUpdateToken, plainWei, handles[0], inputProof);
       await tx.wait();
-      setUpdateTarget(""); setUpdateSalary("");
+      setInlineUpdateAddr(null); setInlineUpdateSalary("");
     });
 
   const handleRemove = (addr: string) =>
@@ -911,9 +964,32 @@ export default function App() {
                           <label>Wallet address</label>
                           <input placeholder="0x…" value={newEmployee} onChange={e => setNewEmployee(e.target.value)} />
                         </div>
+                        {/* Token selector */}
                         <div>
-                          <label>Monthly salary (ETH){newSalary && toUsd(newSalary) ? ` · ${toUsd(newSalary)}` : ""}</label>
-                          <input type="number" placeholder="0.01" value={newSalary} onChange={e => setNewSalary(e.target.value)} />
+                          <label>Salary token</label>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {[{ label: "ETH", idx: 0, color: "#627eea" }, ...SUPPORTED_TOKENS.map(t => ({ label: t.confSymbol, idx: t.tokenIndex, color: t.color }))].map(opt => (
+                              <button
+                                key={opt.idx}
+                                type="button"
+                                onClick={() => setNewSalaryToken(opt.idx)}
+                                style={{
+                                  flex: 1, padding: "7px 0", fontSize: 12, fontWeight: 700,
+                                  background: newSalaryToken === opt.idx ? opt.color : "var(--surface-2)",
+                                  color: newSalaryToken === opt.idx ? "#fff" : "var(--text-2)",
+                                  border: `1.5px solid ${newSalaryToken === opt.idx ? opt.color : "var(--border)"}`,
+                                  borderRadius: "var(--radius-sm)", transform: "none",
+                                }}
+                              >{opt.label}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label>
+                            Monthly salary ({newSalaryToken === 0 ? "ETH" : newSalaryToken === 1 ? "cUSDC" : "cUSDT"})
+                            {newSalaryToken === 0 && newSalary && toUsd(newSalary) ? ` · ${toUsd(newSalary)}` : ""}
+                          </label>
+                          <input type="number" placeholder={newSalaryToken === 0 ? "0.01" : "500"} value={newSalary} onChange={e => setNewSalary(e.target.value)} />
                         </div>
                         <button className="btn-primary" onClick={handleAddEmployee} disabled={busy || !newEmployee || !newSalary || contractClosed} style={{ justifyContent: "center", marginTop: 4 }}>
                           Add Employee
@@ -924,21 +1000,37 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* Update Salary */}
+                    {/* Operator approvals */}
                     <div className="card">
-                      <h3 style={{ marginBottom: 16 }}>Update Salary</h3>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div>
-                          <label>Employee address</label>
-                          <input placeholder="0x…" value={updateTarget} onChange={e => setUpdateTarget(e.target.value)} />
-                        </div>
-                        <div>
-                          <label>New salary (ETH){updateSalary && toUsd(updateSalary) ? ` · ${toUsd(updateSalary)}` : ""}</label>
-                          <input type="number" placeholder="0.01" value={updateSalary} onChange={e => setUpdateSalary(e.target.value)} />
-                        </div>
-                        <button className="btn-ghost" onClick={handleUpdateSalary} disabled={busy || !updateTarget || !updateSalary || contractClosed} style={{ justifyContent: "center", marginTop: 4 }}>
-                          Update Salary
-                        </button>
+                      <h3 style={{ marginBottom: 10 }}>Token Salary Approvals</h3>
+                      <p style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
+                        One-time approval required before paying cUSDC or cUSDT salaries.
+                        Make sure you have wrapped USDC/USDT first via the Swap tab.
+                      </p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {(["cUSDC", "cUSDT"] as const).map(sym => (
+                          <div key={sym} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "var(--bg-alt)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700 }}>{sym}</span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                                background: operatorApproved[sym] ? "var(--success-dim)" : "var(--danger-dim)",
+                                color: operatorApproved[sym] ? "var(--success)" : "var(--danger)",
+                              }}>
+                                {operatorApproved[sym] ? "✓ Approved" : "Not approved"}
+                              </span>
+                            </div>
+                            {!operatorApproved[sym] && (
+                              <button
+                                className="btn-primary btn-sm"
+                                onClick={() => handleApproveOperator(sym)}
+                                disabled={approvingOp[sym] || busy || contractClosed}
+                              >
+                                {approvingOp[sym] ? "Approving…" : `Approve ${sym}`}
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -976,89 +1068,180 @@ export default function App() {
                       {/* Table header */}
                       <div style={{
                         display: "grid",
-                        gridTemplateColumns: showEmployerView ? "28px 1fr 90px 150px 160px 130px" : "1fr 90px 150px 160px",
+                        gridTemplateColumns: showEmployerView ? "28px 1fr 90px 72px 150px 160px 190px" : "1fr 90px 72px 150px 160px",
                         gap: "0 12px", padding: "10px 16px",
                         borderBottom: "1px solid var(--border)", background: "var(--surface-2)",
                       }}>
                         {showEmployerView && <div />}
-                        {["Address", "Status", "Last Paid", "Salary"].map(h => (
+                        {["Address", "Status", "Token", "Last Paid", "Salary"].map(h => (
                           <div key={h} style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
                         ))}
                         {showEmployerView && <div />}
                       </div>
 
                       {employees.map((emp, i) => {
-                        const decrypted = empSalaries[emp.address];
-                        const shown     = empSalaryShown[emp.address];
+                        const decrypted  = empSalaries[emp.address];
+                        const shown      = empSalaryShown[emp.address];
                         const decrypting = empDecrypting[emp.address];
+                        const isEditing  = inlineUpdateAddr === emp.address;
+                        const tokenLabel = SALARY_TOKEN_LABEL[emp.salaryToken] ?? "ETH";
+                        const tokenColor = emp.salaryToken === 1 ? "#2775ca" : emp.salaryToken === 2 ? "#26a17b" : "#627eea";
                         return (
                           <div key={emp.address} style={{
-                            display: "grid",
-                            gridTemplateColumns: showEmployerView ? "28px 1fr 90px 150px 160px 130px" : "1fr 90px 150px 160px",
-                            gap: "0 12px", padding: "12px 16px", alignItems: "center",
                             borderBottom: i < employees.length - 1 ? "1px solid var(--border)" : "none",
-                            background: selectedEmployees.has(emp.address) ? "rgba(255,209,0,0.03)" : "transparent",
-                            transition: "background 0.1s",
                           }}>
-                            {showEmployerView && (
-                              emp.active
-                                ? <input type="checkbox" checked={selectedEmployees.has(emp.address)} onChange={() => toggleSelect(emp.address)} />
-                                : <div />
-                            )}
-                            <code style={{ fontSize: 12 }}>{emp.address}</code>
-                            <span className={`tag ${emp.active ? "tag-active" : "tag-inactive"}`}>{emp.active ? "Active" : "Inactive"}</span>
-                            <span style={{ fontSize: 12, color: "var(--text-2)" }}>{fmtDate(emp.lastPaidAt)}</span>
+                            {/* Main row */}
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: showEmployerView ? "28px 1fr 90px 72px 150px 160px 190px" : "1fr 90px 72px 150px 160px",
+                              gap: "0 12px", padding: "12px 16px", alignItems: "center",
+                              background: selectedEmployees.has(emp.address) ? "rgba(255,209,0,0.03)" : isEditing ? "var(--bg-alt)" : "transparent",
+                              transition: "background 0.1s",
+                            }}>
+                              {showEmployerView && (
+                                emp.active
+                                  ? <input type="checkbox" checked={selectedEmployees.has(emp.address)} onChange={() => toggleSelect(emp.address)} />
+                                  : <div />
+                              )}
+                              <code style={{ fontSize: 12 }}>{emp.address}</code>
+                              <span className={`tag ${emp.active ? "tag-active" : "tag-inactive"}`}>{emp.active ? "Active" : "Inactive"}</span>
 
-                            {/* Salary cell — decrypt/reveal/hide */}
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              {!decrypted ? (
-                                // Not yet decrypted
-                                showEmployerView ? (
-                                  <button
-                                    className="btn-ghost btn-sm"
-                                    onClick={() => handleDecryptEmpSalary(emp.address)}
-                                    disabled={decrypting || busy}
-                                    style={{ fontSize: 11, padding: "4px 10px" }}
-                                  >
-                                    {decrypting ? "…" : <><LockIcon /> Reveal</>}
-                                  </button>
+                              {/* Token badge */}
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999,
+                                background: `${tokenColor}22`, color: tokenColor,
+                                border: `1px solid ${tokenColor}44`, whiteSpace: "nowrap",
+                              }}>{tokenLabel}</span>
+
+                              <span style={{ fontSize: 12, color: "var(--text-2)" }}>{fmtDate(emp.lastPaidAt)}</span>
+
+                              {/* Salary cell — decrypt/reveal/hide */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {!decrypted ? (
+                                  showEmployerView ? (
+                                    <button
+                                      className="btn-ghost btn-sm"
+                                      onClick={() => handleDecryptEmpSalary(emp.address)}
+                                      disabled={decrypting || busy}
+                                      style={{ fontSize: 11, padding: "4px 10px" }}
+                                    >
+                                      {decrypting ? "…" : <><LockIcon /> Reveal</>}
+                                    </button>
+                                  ) : (
+                                    <span className="tag tag-encrypted"><LockIcon /> Hidden</span>
+                                  )
+                                ) : shown ? (
+                                  <>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)" }}>{decrypted}</span>
+                                    <button
+                                      onClick={() => toggleEmpSalaryVisibility(emp.address)}
+                                      style={{ background: "none", border: "none", padding: "3px", color: "var(--muted)", cursor: "pointer", display: "flex", borderRadius: 4 }}
+                                      title="Hide"
+                                    >
+                                      <EyeIcon off />
+                                    </button>
+                                  </>
                                 ) : (
-                                  <span className="tag tag-encrypted"><LockIcon /> Hidden</span>
-                                )
-                              ) : shown ? (
-                                // Decrypted and visible
-                                <>
-                                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)" }}>{decrypted}</span>
-                                  <button
-                                    onClick={() => toggleEmpSalaryVisibility(emp.address)}
-                                    style={{ background: "none", border: "none", padding: "3px", color: "var(--muted)", cursor: "pointer", display: "flex", borderRadius: 4 }}
-                                    title="Hide"
-                                  >
-                                    <EyeIcon off />
-                                  </button>
-                                </>
-                              ) : (
-                                // Decrypted but hidden
-                                <>
-                                  <span style={{ color: "var(--muted)", letterSpacing: 4, fontSize: 14 }}>••••••</span>
-                                  <button
-                                    onClick={() => toggleEmpSalaryVisibility(emp.address)}
-                                    style={{ background: "none", border: "none", padding: "3px", color: "var(--muted)", cursor: "pointer", display: "flex", borderRadius: 4 }}
-                                    title="Reveal"
-                                  >
-                                    <EyeIcon />
-                                  </button>
-                                </>
+                                  <>
+                                    <span style={{ color: "var(--muted)", letterSpacing: 4, fontSize: 14 }}>••••••</span>
+                                    <button
+                                      onClick={() => toggleEmpSalaryVisibility(emp.address)}
+                                      style={{ background: "none", border: "none", padding: "3px", color: "var(--muted)", cursor: "pointer", display: "flex", borderRadius: 4 }}
+                                      title="Reveal"
+                                    >
+                                      <EyeIcon />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+
+                              {showEmployerView && (
+                                emp.active ? (
+                                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                    <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy || contractClosed} style={{ fontSize: 11 }}>Pay</button>
+                                    <button
+                                      className="btn-ghost btn-sm"
+                                      onClick={() => {
+                                        if (isEditing) {
+                                          setInlineUpdateAddr(null);
+                                          setInlineUpdateSalary("");
+                                        } else {
+                                          setInlineUpdateAddr(emp.address);
+                                          setInlineUpdateToken(emp.salaryToken);
+                                          setInlineUpdateSalary("");
+                                        }
+                                      }}
+                                      disabled={busy || contractClosed}
+                                      style={{ fontSize: 11 }}
+                                    >
+                                      {isEditing ? "Cancel" : "Edit"}
+                                    </button>
+                                    <button className="btn-danger btn-sm" onClick={() => handleRemove(emp.address)} disabled={busy || contractClosed} style={{ fontSize: 11 }}>Remove</button>
+                                  </div>
+                                ) : <div />
                               )}
                             </div>
 
-                            {showEmployerView && (
-                              emp.active ? (
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy || contractClosed}>Pay</button>
-                                  <button className="btn-danger btn-sm" onClick={() => handleRemove(emp.address)} disabled={busy || contractClosed}>Remove</button>
+                            {/* Inline update form — shown when this row is being edited */}
+                            {isEditing && showEmployerView && (
+                              <div style={{
+                                padding: "14px 16px 16px",
+                                background: "var(--bg-alt)",
+                                borderTop: "1px solid var(--border)",
+                              }}>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                                  Update salary for {short(emp.address)}
                                 </div>
-                              ) : <div />
+                                <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+                                  {/* Token selector */}
+                                  <div style={{ display: "flex", gap: 5 }}>
+                                    {[{ label: "ETH", idx: 0, color: "#627eea" }, ...SUPPORTED_TOKENS.map(t => ({ label: t.confSymbol, idx: t.tokenIndex, color: t.color }))].map(opt => (
+                                      <button
+                                        key={opt.idx}
+                                        type="button"
+                                        onClick={() => setInlineUpdateToken(opt.idx)}
+                                        style={{
+                                          padding: "5px 12px", fontSize: 11, fontWeight: 700,
+                                          background: inlineUpdateToken === opt.idx ? opt.color : "var(--surface-2)",
+                                          color: inlineUpdateToken === opt.idx ? "#fff" : "var(--text-2)",
+                                          border: `1.5px solid ${inlineUpdateToken === opt.idx ? opt.color : "var(--border)"}`,
+                                          borderRadius: "var(--radius-sm)", transform: "none",
+                                        }}
+                                      >{opt.label}</button>
+                                    ))}
+                                  </div>
+                                  {/* Amount input */}
+                                  <div style={{ flex: 1, minWidth: 120 }}>
+                                    <input
+                                      type="number"
+                                      placeholder={inlineUpdateToken === 0 ? "e.g. 0.05" : "e.g. 500"}
+                                      value={inlineUpdateSalary}
+                                      onChange={e => setInlineUpdateSalary(e.target.value)}
+                                      onKeyDown={e => e.key === "Enter" && inlineUpdateSalary && handleInlineUpdate(emp.address)}
+                                      style={{ width: "100%" }}
+                                    />
+                                  </div>
+                                  <button
+                                    className="btn-primary btn-sm"
+                                    onClick={() => handleInlineUpdate(emp.address)}
+                                    disabled={busy || !inlineUpdateSalary || contractClosed}
+                                    style={{ fontSize: 11, whiteSpace: "nowrap" }}
+                                  >
+                                    Confirm Update
+                                  </button>
+                                  <button
+                                    className="btn-ghost btn-sm"
+                                    onClick={() => { setInlineUpdateAddr(null); setInlineUpdateSalary(""); }}
+                                    disabled={busy}
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                                <p style={{ marginTop: 8, fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                                  <LockIcon /> New salary is encrypted client-side before being sent to the chain.
+                                </p>
+                              </div>
                             )}
                           </div>
                         );

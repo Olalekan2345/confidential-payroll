@@ -1,5 +1,5 @@
 // ─── Factory ──────────────────────────────────────────────────────────────────
-export const FACTORY_ADDRESS = "0xD9AB1aAE8Ca9C1a5023205242FD56583a0E9bbf0";
+export const FACTORY_ADDRESS = "0x616F1e291E77F518D7E6f0706c3473FF18ACF3bB";
 
 export const FACTORY_ABI = [
   "function create() returns (address)",
@@ -9,13 +9,17 @@ export const FACTORY_ABI = [
 ] as const;
 
 // ─── Per-employer Payroll ─────────────────────────────────────────────────────
+// SalaryToken enum: 0=ETH, 1=cUSDC, 2=cUSDT
 export const PAYROLL_ABI = [
   "function employer() view returns (address)",
   "function closed() view returns (bool)",
+  "function confUsdcAddress() view returns (address)",
+  "function confUsdtAddress() view returns (address)",
   "function fundPayroll() payable",
   "function closePayroll()",
-  "function addEmployee(address employee, uint256 salaryWei, bytes32 encSalary, bytes calldata inputProof)",
-  "function updateSalary(address employee, uint256 newSalaryWei, bytes32 encNewSalary, bytes calldata inputProof)",
+  // token: 0=ETH, 1=cUSDC, 2=cUSDT
+  "function addEmployee(address employee, uint8 token, uint256 salaryWei, bytes32 encSalary, bytes calldata inputProof)",
+  "function updateSalary(address employee, uint8 token, uint256 newSalaryWei, bytes32 encNewSalary, bytes calldata inputProof)",
   "function removeEmployee(address employee)",
   "function paySalary(address employee)",
   "function payAll()",
@@ -23,7 +27,7 @@ export const PAYROLL_ABI = [
   "function getMySalary() view returns (bytes32)",
   "function getMyTotalPaid() view returns (bytes32)",
   "function getEmployeeList() view returns (address[])",
-  "function getEmployeeInfo(address employee) view returns (bool active, uint256 lastPaidAt)",
+  "function getEmployeeInfo(address employee) view returns (bool active, uint256 lastPaidAt, uint8 salaryToken)",
   "function getEmployeeSalary(address employee) view returns (bytes32)",
   "event EmployeeAdded(address indexed employee)",
   "event EmployeeRemoved(address indexed employee)",
@@ -53,38 +57,33 @@ export const ERC20_ABI = [
 ] as const;
 
 export const CONF_ERC20_ABI = [
-  // Token info
   "function name() view returns (string)",
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
   "function underlying() view returns (address)",
-  // Wrap / unwrap
   "function wrap(uint64 amount)",
   "function unwrap(uint64 amount)",
-  // Confidential transfer
   "function transfer(address to, bytes32 encAmount, bytes calldata inputProof)",
-  // Operator (payroll) support
   "function approveOperator(address operator, bool approved)",
   "function isOperatorApproved(address operator, address owner) view returns (bool)",
   "function operatorTransfer(address from, address to, bytes32 amount)",
-  // View — returns encrypted handle, use userDecrypt in UI
   "function balanceOf(address account) view returns (bytes32)",
-  // Events
   "event Wrap(address indexed account, uint256 amount)",
   "event Unwrap(address indexed account, uint256 amount)",
   "event Transfer(address indexed from, address indexed to)",
 ] as const;
 
-// ─── Token registry — used in Swap tab and dropdowns ─────────────────────────
+// ─── Token registry ───────────────────────────────────────────────────────────
 
 export type TokenInfo = {
-  symbol:     string;
-  name:       string;
-  address:    string;
-  confAddress:string;
-  confSymbol: string;
-  decimals:   number;
-  color:      string;
+  symbol:      string;
+  name:        string;
+  address:     string;
+  confAddress: string;
+  confSymbol:  string;
+  decimals:    number;
+  color:       string;
+  tokenIndex:  number; // matches SalaryToken enum: 1=cUSDC, 2=cUSDT
 };
 
 export const SUPPORTED_TOKENS: TokenInfo[] = [
@@ -96,6 +95,7 @@ export const SUPPORTED_TOKENS: TokenInfo[] = [
     confSymbol:  "cUSDC",
     decimals:    6,
     color:       "#2775ca",
+    tokenIndex:  1,
   },
   {
     symbol:      "USDT",
@@ -105,5 +105,13 @@ export const SUPPORTED_TOKENS: TokenInfo[] = [
     confSymbol:  "cUSDT",
     decimals:    6,
     color:       "#26a17b",
+    tokenIndex:  2,
   },
 ];
+
+// Token index 0 = ETH (no entry in SUPPORTED_TOKENS)
+export const SALARY_TOKEN_LABEL: Record<number, string> = {
+  0: "ETH",
+  1: "cUSDC",
+  2: "cUSDT",
+};

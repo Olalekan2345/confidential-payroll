@@ -29,6 +29,8 @@ export interface ConfidentialPayrollInterface extends Interface {
       | "addEmployee"
       | "closePayroll"
       | "closed"
+      | "confUsdcAddress"
+      | "confUsdtAddress"
       | "confidentialProtocolId"
       | "employer"
       | "fundPayroll"
@@ -57,13 +59,21 @@ export interface ConfidentialPayrollInterface extends Interface {
 
   encodeFunctionData(
     functionFragment: "addEmployee",
-    values: [AddressLike, BigNumberish, BytesLike, BytesLike]
+    values: [AddressLike, BigNumberish, BigNumberish, BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "closePayroll",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "closed", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "confUsdcAddress",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "confUsdtAddress",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "confidentialProtocolId",
     values?: undefined
@@ -104,7 +114,7 @@ export interface ConfidentialPayrollInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "updateSalary",
-    values: [AddressLike, BigNumberish, BytesLike, BytesLike]
+    values: [AddressLike, BigNumberish, BigNumberish, BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawSurplus",
@@ -120,6 +130,14 @@ export interface ConfidentialPayrollInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "closed", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "confUsdcAddress",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "confUsdtAddress",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "confidentialProtocolId",
     data: BytesLike
@@ -308,6 +326,7 @@ export interface ConfidentialPayroll extends BaseContract {
   addEmployee: TypedContractMethod<
     [
       employee: AddressLike,
+      token: BigNumberish,
       salaryWei: BigNumberish,
       encSalary: BytesLike,
       inputProof: BytesLike
@@ -320,6 +339,10 @@ export interface ConfidentialPayroll extends BaseContract {
 
   closed: TypedContractMethod<[], [boolean], "view">;
 
+  confUsdcAddress: TypedContractMethod<[], [string], "view">;
+
+  confUsdtAddress: TypedContractMethod<[], [string], "view">;
+
   confidentialProtocolId: TypedContractMethod<[], [bigint], "view">;
 
   employer: TypedContractMethod<[], [string], "view">;
@@ -328,7 +351,13 @@ export interface ConfidentialPayroll extends BaseContract {
 
   getEmployeeInfo: TypedContractMethod<
     [employee: AddressLike],
-    [[boolean, bigint] & { active: boolean; lastPaidAt: bigint }],
+    [
+      [boolean, bigint, bigint] & {
+        active: boolean;
+        lastPaidAt: bigint;
+        salaryToken: bigint;
+      }
+    ],
     "view"
   >;
 
@@ -357,6 +386,7 @@ export interface ConfidentialPayroll extends BaseContract {
   updateSalary: TypedContractMethod<
     [
       employee: AddressLike,
+      token: BigNumberish,
       newSalaryWei: BigNumberish,
       encNewSalary: BytesLike,
       inputProof: BytesLike
@@ -380,6 +410,7 @@ export interface ConfidentialPayroll extends BaseContract {
   ): TypedContractMethod<
     [
       employee: AddressLike,
+      token: BigNumberish,
       salaryWei: BigNumberish,
       encSalary: BytesLike,
       inputProof: BytesLike
@@ -394,6 +425,12 @@ export interface ConfidentialPayroll extends BaseContract {
     nameOrSignature: "closed"
   ): TypedContractMethod<[], [boolean], "view">;
   getFunction(
+    nameOrSignature: "confUsdcAddress"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "confUsdtAddress"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
     nameOrSignature: "confidentialProtocolId"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -406,7 +443,13 @@ export interface ConfidentialPayroll extends BaseContract {
     nameOrSignature: "getEmployeeInfo"
   ): TypedContractMethod<
     [employee: AddressLike],
-    [[boolean, bigint] & { active: boolean; lastPaidAt: bigint }],
+    [
+      [boolean, bigint, bigint] & {
+        active: boolean;
+        lastPaidAt: bigint;
+        salaryToken: bigint;
+      }
+    ],
     "view"
   >;
   getFunction(
@@ -435,6 +478,7 @@ export interface ConfidentialPayroll extends BaseContract {
   ): TypedContractMethod<
     [
       employee: AddressLike,
+      token: BigNumberish,
       newSalaryWei: BigNumberish,
       encNewSalary: BytesLike,
       inputProof: BytesLike
