@@ -91,14 +91,13 @@ export default function App() {
   // form fields
   const [newEmployee,    setNewEmployee]    = useState("");
   const [newSalary,      setNewSalary]      = useState("");
-  const [newSalaryToken, setNewSalaryToken] = useState<number>(0); // 0=ETH,1=cUSDC,2=cUSDT
-  const [fundAmount,     setFundAmount]     = useState("");
-  const [withdrawAmt,    setWithdrawAmt]    = useState("");
+  const [newSalaryToken, setNewSalaryToken] = useState<number>(1); // 1=cUSDC,2=cUSDT
+
 
   // inline per-row update form
   const [inlineUpdateAddr,   setInlineUpdateAddr]   = useState<string | null>(null);
   const [inlineUpdateSalary, setInlineUpdateSalary] = useState("");
-  const [inlineUpdateToken,  setInlineUpdateToken]  = useState<number>(0);
+  const [inlineUpdateToken,  setInlineUpdateToken]  = useState<number>(1);
 
   // operator approval state
   const [operatorApproved, setOperatorApproved] = useState<Record<string, boolean>>({});
@@ -202,14 +201,10 @@ export default function App() {
   }, [payrollAddress]);
 
   const loadBalances = async () => {
-    if (!fhevm.provider || !fhevm.address || !payrollAddress) return;
+    if (!fhevm.provider || !fhevm.address) return;
     try {
-      const [wWei, cWei] = await Promise.all([
-        fhevm.provider.getBalance(fhevm.address),
-        fhevm.provider.getBalance(payrollAddress),
-      ]);
+      const wWei = await fhevm.provider.getBalance(fhevm.address);
       setWalletBalance(parseFloat(ethers.formatEther(wWei)).toFixed(4));
-      setContractBalance(parseFloat(ethers.formatEther(cWei)).toFixed(4));
     } catch { /* ignore */ }
   };
 
@@ -346,20 +341,6 @@ export default function App() {
     }
   };
 
-  const handleFund = () =>
-    wrap("Fund payroll", async () => {
-      const tx = await contract(true).fundPayroll({ value: ethers.parseEther(fundAmount) });
-      await tx.wait();
-      setFundAmount("");
-    });
-
-  const handleWithdraw = () =>
-    wrap("Withdraw surplus", async () => {
-      const tx = await contract(true).withdrawSurplus(ethers.parseEther(withdrawAmt));
-      await tx.wait();
-      setWithdrawAmt("");
-    });
-
   const handleClosePayroll = async () => {
     setBusy(true);
     setStatus(null);
@@ -392,22 +373,17 @@ export default function App() {
     setViewAs("employer");
   };
 
-  // Convert salary input to wei based on token type
-  // ETH uses 18 decimals; cUSDC/cUSDT use 6 decimals
-  const parseSalaryAmount = (amount: string, token: number): bigint => {
-    if (token === 0) return ethers.parseEther(amount);
-    return ethers.parseUnits(amount, 6);
-  };
+  // Convert salary input to token units (cUSDC/cUSDT use 6 decimals)
+  const parseSalaryAmount = (amount: string): bigint => ethers.parseUnits(amount, 6);
 
   const handleAddEmployee = () =>
     wrap("Add employee", async () => {
       if (!fhevm.instance) throw new Error("FHEVM instance not ready");
-      const salaryWei = parseSalaryAmount(newSalary, newSalaryToken);
+      const salaryWei = parseSalaryAmount(newSalary);
       const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(salaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
-      const plainWei = newSalaryToken === 0 ? salaryWei : 0n;
-      const tx = await contract(true).addEmployee(newEmployee, newSalaryToken, plainWei, handles[0], inputProof);
+      const tx = await contract(true).addEmployee(newEmployee, newSalaryToken, 0n, handles[0], inputProof);
       await tx.wait();
       setNewEmployee(""); setNewSalary("");
     });
@@ -415,12 +391,11 @@ export default function App() {
   const handleInlineUpdate = (addr: string) =>
     wrap("Update salary", async () => {
       if (!fhevm.instance) throw new Error("FHEVM instance not ready");
-      const salaryWei = parseSalaryAmount(inlineUpdateSalary, inlineUpdateToken);
+      const salaryWei = parseSalaryAmount(inlineUpdateSalary);
       const input = fhevm.instance.createEncryptedInput(payrollAddress, fhevm.address);
       const zkProof = input.add64(salaryWei).generateZKProof();
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
-      const plainWei = inlineUpdateToken === 0 ? salaryWei : 0n;
-      const tx = await contract(true).updateSalary(addr, inlineUpdateToken, plainWei, handles[0], inputProof);
+      const tx = await contract(true).updateSalary(addr, inlineUpdateToken, 0n, handles[0], inputProof);
       await tx.wait();
       setInlineUpdateAddr(null); setInlineUpdateSalary("");
     });
@@ -504,16 +479,22 @@ export default function App() {
     }
   };
 
+  // Format a decrypted salary value — cUSDC/cUSDT use 6 decimals
+  const formatTokenAmount = (val: bigint, salaryToken: number): string => {
+    const sym = SALARY_TOKEN_LABEL[salaryToken] ?? "cUSDC";
+    const amt = ethers.formatUnits(val, 6);
+    return `${parseFloat(amt).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${sym}`;
+  };
+
   const handleDecryptMySalary = async () => {
     if (!fhevm.instance) return fail("FHEVM instance not ready");
     setBusy(true); setStatus(null);
     try {
       if (!await assertEmployeeRegistered()) return;
+      const [, , salaryToken] = await contract().getEmployeeInfo(fhevm.address);
       const handle = await contract(true).getMySalary();
       const val = await userDecryptHandle(handle);
-      const ethAmt1 = ethers.formatEther(val);
-      const usd1 = toUsd(ethAmt1);
-      setMySalaryDecrypted(usd1 ? `${ethAmt1} ETH (${usd1})` : `${ethAmt1} ETH`);
+      setMySalaryDecrypted(formatTokenAmount(val, Number(salaryToken)));
       setShowSalary(true);
     } catch (e: unknown) {
       fail(e instanceof Error ? e.message : "Decryption failed");
@@ -525,11 +506,10 @@ export default function App() {
     setBusy(true); setStatus(null);
     try {
       if (!await assertEmployeeRegistered()) return;
+      const [, , salaryToken] = await contract().getEmployeeInfo(fhevm.address);
       const handle = await contract(true).getMyTotalPaid();
       const val = await userDecryptHandle(handle);
-      const ethAmt2 = ethers.formatEther(val);
-      const usd2 = toUsd(ethAmt2);
-      setMyTotalPaidDecrypted(usd2 ? `${ethAmt2} ETH (${usd2})` : `${ethAmt2} ETH`);
+      setMyTotalPaidDecrypted(formatTokenAmount(val, Number(salaryToken)));
       setShowTotalPaid(true);
     } catch (e: unknown) {
       fail(e instanceof Error ? e.message : "Decryption failed");
@@ -543,12 +523,10 @@ export default function App() {
     if (!fhevm.instance) return fail("FHEVM instance not ready");
     setEmpDecrypting(prev => ({ ...prev, [addr]: true }));
     try {
+      const emp = employees.find(e => e.address === addr);
       const handle = await contract(true).getEmployeeSalary(addr);
       const val = await userDecryptHandle(handle);
-      const ethAmt = ethers.formatEther(val);
-      const usd = toUsd(ethAmt);
-      const display = usd ? `${ethAmt} ETH (${usd})` : `${ethAmt} ETH`;
-      setEmpSalaries(prev => ({ ...prev, [addr]: display }));
+      setEmpSalaries(prev => ({ ...prev, [addr]: formatTokenAmount(val, emp?.salaryToken ?? 1) }));
       setEmpSalaryShown(prev => ({ ...prev, [addr]: true }));
     } catch (e: unknown) {
       fail(e instanceof Error ? e.message : "Decryption failed");
@@ -823,16 +801,28 @@ export default function App() {
 
             {/* ── Stat row (employer) ── */}
             {showEmployerView && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
-                {[
-                  { label: "Pool Balance",     value: contractBalance ? `${contractBalance} ETH` : "—", sub: contractBalance ? toUsd(contractBalance) : null, cls: "accent" },
-                  { label: "Active Employees", value: String(activeCount), sub: null, cls: "" },
-                  { label: "Your Balance",     value: walletBalance ? `${walletBalance} ETH` : "—", sub: walletBalance ? toUsd(walletBalance) : null, cls: "" },
-                ].map(s => (
-                  <div key={s.label} className="card" style={{ padding: "16px 20px" }}>
-                    <div className="stat-label">{s.label}</div>
-                    <div className={`stat-value ${s.cls}`} style={{ marginTop: 6 }}>{s.value}</div>
-                    {s.sub && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>≈ {s.sub}</div>}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 28 }}>
+                <div className="card" style={{ padding: "16px 20px" }}>
+                  <div className="stat-label">Active Employees</div>
+                  <div className="stat-value" style={{ marginTop: 6 }}>{activeCount}</div>
+                </div>
+                <div className="card" style={{ padding: "16px 20px" }}>
+                  <div className="stat-label">Your Wallet (ETH)</div>
+                  <div className="stat-value" style={{ marginTop: 6 }}>{walletBalance ?? "—"}</div>
+                  {walletBalance && toUsd(walletBalance) && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>≈ {toUsd(walletBalance)}</div>}
+                </div>
+                {(["cUSDC", "cUSDT"] as const).map(sym => (
+                  <div key={sym} className="card" style={{ padding: "16px 20px" }}>
+                    <div className="stat-label">{sym} Operator</div>
+                    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, padding: "3px 9px", borderRadius: 999,
+                        background: operatorApproved[sym] ? "var(--success-dim)" : "var(--danger-dim)",
+                        color: operatorApproved[sym] ? "var(--success)" : "var(--danger)",
+                      }}>
+                        {operatorApproved[sym] ? "✓ Approved" : "Not approved"}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -888,41 +878,30 @@ export default function App() {
                 {showEmployerView && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
 
-                    {/* Payroll Pool */}
+                    {/* Token Payroll Info */}
                     <div className="card" style={{ gridColumn: "1 / -1" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                         <div>
-                          <h3 style={{ marginBottom: 4 }}>Payroll Pool</h3>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                            <span style={{ fontSize: 26, fontWeight: 700, color: "var(--accent)" }}>{contractBalance ?? "—"}</span>
-                            <span style={{ fontSize: 13, color: "var(--text-2)" }}>ETH</span>
-                            {contractBalance && toUsd(contractBalance) && (
-                              <span style={{ fontSize: 13, color: "var(--muted)" }}>≈ {toUsd(contractBalance)}</span>
-                            )}
-                          </div>
+                          <h3 style={{ marginBottom: 4 }}>Confidential Token Payroll</h3>
+                          <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
+                            Salaries are paid from your <strong style={{ color: "var(--text)" }}>cUSDC</strong> or <strong style={{ color: "var(--text)" }}>cUSDT</strong> wallet balance directly to each employee.
+                            All transfers are fully encrypted — no amounts visible on Etherscan.
+                          </p>
                         </div>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFD100" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                          </svg>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--accent-dim)", border: "1px solid rgba(255,209,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 16 }}>
+                          <LockIcon />
                         </div>
                       </div>
-                      <hr className="divider" />
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto", gap: 10, alignItems: "flex-end" }}>
-                        <div>
-                          <label>Deposit ETH{fundAmount && toUsd(fundAmount) ? ` · ${toUsd(fundAmount)}` : ""}</label>
-                          <input type="number" placeholder="0.05" value={fundAmount} onChange={e => setFundAmount(e.target.value)} />
+
+                      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: 220, background: "var(--bg-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "12px 14px" }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>How it works</div>
+                          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--text-2)", lineHeight: 2 }}>
+                            <li>Use the <strong style={{ color: "var(--text)" }}>⇄ Swap</strong> tab to wrap USDC/USDT into cUSDC/cUSDT</li>
+                            <li>Approve this payroll contract as operator in <strong style={{ color: "var(--text)" }}>Token Approvals</strong> below</li>
+                            <li>Add employees with a cUSDC or cUSDT salary, then click <strong style={{ color: "var(--text)" }}>Pay</strong></li>
+                          </ol>
                         </div>
-                        <button className="btn-primary btn-sm" onClick={handleFund} disabled={busy || !fundAmount || contractClosed} style={{ marginBottom: 1 }}>
-                          Deposit
-                        </button>
-                        <div>
-                          <label>Withdraw ETH{withdrawAmt && toUsd(withdrawAmt) ? ` · ${toUsd(withdrawAmt)}` : ""}</label>
-                          <input type="number" placeholder="0.01" value={withdrawAmt} onChange={e => setWithdrawAmt(e.target.value)} />
-                        </div>
-                        <button className="btn-ghost btn-sm" onClick={handleWithdraw} disabled={busy || !withdrawAmt || contractClosed} style={{ marginBottom: 1 }}>
-                          Withdraw
-                        </button>
                       </div>
 
                       {/* Close Payroll */}
@@ -942,7 +921,7 @@ export default function App() {
                             Are you sure? This permanently closes the payroll.
                           </p>
                           <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 14, lineHeight: 1.6 }}>
-                            All remaining ETH will be refunded to your wallet. No further deposits, payments, or employee changes will be possible.
+                            No further payments or employee changes will be possible after closing.
                           </p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button className="btn-danger btn-sm" onClick={handleClosePayroll} disabled={busy}>
@@ -968,7 +947,7 @@ export default function App() {
                         <div>
                           <label>Salary token</label>
                           <div style={{ display: "flex", gap: 6 }}>
-                            {[{ label: "ETH", idx: 0, color: "#627eea" }, ...SUPPORTED_TOKENS.map(t => ({ label: t.confSymbol, idx: t.tokenIndex, color: t.color }))].map(opt => (
+                            {SUPPORTED_TOKENS.map(t => ({ label: t.confSymbol, idx: t.tokenIndex, color: t.color })).map(opt => (
                               <button
                                 key={opt.idx}
                                 type="button"
@@ -985,11 +964,8 @@ export default function App() {
                           </div>
                         </div>
                         <div>
-                          <label>
-                            Monthly salary ({newSalaryToken === 0 ? "ETH" : newSalaryToken === 1 ? "cUSDC" : "cUSDT"})
-                            {newSalaryToken === 0 && newSalary && toUsd(newSalary) ? ` · ${toUsd(newSalary)}` : ""}
-                          </label>
-                          <input type="number" placeholder={newSalaryToken === 0 ? "0.01" : "500"} value={newSalary} onChange={e => setNewSalary(e.target.value)} />
+                          <label>Monthly salary ({newSalaryToken === 1 ? "cUSDC" : "cUSDT"})</label>
+                          <input type="number" placeholder="500" value={newSalary} onChange={e => setNewSalary(e.target.value)} />
                         </div>
                         <button className="btn-primary" onClick={handleAddEmployee} disabled={busy || !newEmployee || !newSalary || contractClosed} style={{ justifyContent: "center", marginTop: 4 }}>
                           Add Employee
@@ -1167,7 +1143,7 @@ export default function App() {
                                           setInlineUpdateSalary("");
                                         } else {
                                           setInlineUpdateAddr(emp.address);
-                                          setInlineUpdateToken(emp.salaryToken);
+                                          setInlineUpdateToken(emp.salaryToken === 0 ? 1 : emp.salaryToken);
                                           setInlineUpdateSalary("");
                                         }
                                       }}
@@ -1195,7 +1171,7 @@ export default function App() {
                                 <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
                                   {/* Token selector */}
                                   <div style={{ display: "flex", gap: 5 }}>
-                                    {[{ label: "ETH", idx: 0, color: "#627eea" }, ...SUPPORTED_TOKENS.map(t => ({ label: t.confSymbol, idx: t.tokenIndex, color: t.color }))].map(opt => (
+                                    {SUPPORTED_TOKENS.map(t => ({ label: t.confSymbol, idx: t.tokenIndex, color: t.color })).map(opt => (
                                       <button
                                         key={opt.idx}
                                         type="button"
@@ -1214,7 +1190,7 @@ export default function App() {
                                   <div style={{ flex: 1, minWidth: 120 }}>
                                     <input
                                       type="number"
-                                      placeholder={inlineUpdateToken === 0 ? "e.g. 0.05" : "e.g. 500"}
+                                      placeholder="e.g. 500"
                                       value={inlineUpdateSalary}
                                       onChange={e => setInlineUpdateSalary(e.target.value)}
                                       onKeyDown={e => e.key === "Enter" && inlineUpdateSalary && handleInlineUpdate(emp.address)}
@@ -1265,9 +1241,9 @@ export default function App() {
                       <div style={{ flex: 1 }}>
                         <h2 style={{ marginBottom: 6 }}>How you receive your salary</h2>
                         <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 12 }}>
-                          When the employer runs <strong style={{ color: "var(--text)" }}>Pay Salary</strong>, ETH is transferred
-                          directly to your wallet address on-chain — no action needed from you.
-                          Your salary <em>rate</em> is stored encrypted so co-workers cannot see what you earn.
+                          When the employer runs <strong style={{ color: "var(--text)" }}>Pay Salary</strong>, encrypted cUSDC or cUSDT
+                          is transferred confidentially to your wallet — no amount is visible on-chain.
+                          Use the <strong style={{ color: "var(--text)" }}>⇄ Swap</strong> tab to unwrap your cUSDC/cUSDT back to USDC/USDT.
                         </p>
                         <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
                           <div>
@@ -1280,11 +1256,8 @@ export default function App() {
                             )}
                           </div>
                           <div style={{ fontSize: 12, color: "var(--muted)", maxWidth: 280 }}>
-                            Check this address on{" "}
-                            <a href={`https://sepolia.etherscan.io/address/${fhevm.address}`} target="_blank" rel="noreferrer">
-                              Sepolia Etherscan ↗
-                            </a>{" "}
-                            to see incoming salary transactions.
+                            Once paid, use the <strong style={{ color: "var(--text)" }}>⇄ Swap</strong> tab above to
+                            unwrap your cUSDC or cUSDT back to spendable USDC/USDT.
                           </div>
                         </div>
                       </div>
@@ -1300,7 +1273,7 @@ export default function App() {
                       <div>
                         <h2>My Encrypted Salary</h2>
                         <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                          Stored as an FHE ciphertext — only you can decrypt it
+                          Stored as an FHE ciphertext — only you can decrypt it (cUSDC / cUSDT)
                         </p>
                       </div>
                     </div>
@@ -1341,7 +1314,7 @@ export default function App() {
                           </button>
                         ) : (
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <span style={{ fontSize: 11, color: "var(--muted)" }}>/ month</span>
+                            <span style={{ fontSize: 11, color: "var(--muted)" }}>per pay period</span>
                             <button className="btn-ghost btn-sm" onClick={handleDecryptMySalary} disabled={busy} style={{ fontSize: 11, padding: "4px 10px" }}>
                               Refresh
                             </button>
