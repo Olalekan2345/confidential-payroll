@@ -85,7 +85,6 @@ export default function App() {
   const [busy,              setBusy]              = useState(false);
   const [tab,               setTab]               = useState<"overview" | "history" | "swap">("overview");
   const [walletBalance,     setWalletBalance]     = useState<string | null>(null);
-  const [contractBalance,   setContractBalance]   = useState<string | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
 
   // form fields
@@ -167,7 +166,6 @@ export default function App() {
     setPayrollAddress("");
     setEmployees([]);
     setWalletBalance(null);
-    setContractBalance(null);
     setMySalaryDecrypted(null);
     setMyTotalPaidDecrypted(null);
     setShowSalary(false);
@@ -349,8 +347,7 @@ export default function App() {
       const tx = await contract(true).closePayroll();
       await tx.wait();
       setContractClosed(true);
-      setContractBalance("0");
-      ok("Payroll closed. All remaining ETH has been refunded to your wallet.");
+      ok("Payroll closed. No further payments or changes are possible.");
       await loadBalances();
     } catch (e: unknown) {
       fail(e instanceof Error ? e.message : "Close payroll failed");
@@ -365,7 +362,6 @@ export default function App() {
     setSetupPhase("setup");
     setEmployerAddr("");
     setEmployees([]);
-    setContractBalance(null);
     setWalletBalance(null);
     setStatus(null);
     setContractClosed(false);
@@ -858,6 +854,7 @@ export default function App() {
                   signer={fhevm.signer}
                   address={fhevm.address}
                   instance={fhevm.instance}
+                  isEmployer={fhevm.isEmployer}
                 />
               ) : (
                 <div className="card" style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)", fontSize: 13 }}>
@@ -1012,8 +1009,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* ══ EMPLOYEE LIST ══ */}
-                <div style={{ marginBottom: 28 }}>
+                {/* ══ EMPLOYEE LIST (employer only) ══ */}
+                {showEmployerView && <div style={{ marginBottom: 28 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <h2>Employees</h2>
@@ -1224,7 +1221,7 @@ export default function App() {
                       })}
                     </div>
                   )}
-                </div>
+                </div>}
 
                 {/* ══ EMPLOYEE SELF-SERVICE ══ */}
                 {!showEmployerView && (

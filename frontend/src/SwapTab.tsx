@@ -39,11 +39,13 @@ export function SwapTab({
   signer,
   address,
   instance,
+  isEmployer,
 }: {
-  provider: BrowserProvider;
-  signer:   ethers.JsonRpcSigner;
-  address:  string;
-  instance: FhevmInstance;
+  provider:   BrowserProvider;
+  signer:     ethers.JsonRpcSigner;
+  address:    string;
+  instance:   FhevmInstance;
+  isEmployer: boolean;
 }) {
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(SUPPORTED_TOKENS[0]);
   const [direction,     setDirection]     = useState<Direction>("wrap");
@@ -246,9 +248,11 @@ export function SwapTab({
             <button className="btn-ghost btn-sm" onClick={() => loadPlainBalance(selectedToken)} disabled={busy}>
               ↻ Refresh
             </button>
-            <button className="btn-ghost btn-sm" onClick={() => handleMint(selectedToken)} disabled={busy} title="Get free test tokens">
-              + Free Mint
-            </button>
+            {isEmployer && (
+              <button className="btn-ghost btn-sm" onClick={() => handleMint(selectedToken)} disabled={busy} title="Get free test tokens">
+                + Free Mint
+              </button>
+            )}
           </div>
         </div>
 
