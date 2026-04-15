@@ -1083,7 +1083,21 @@ export default function App() {
 
                               {showEmployerView && (
                                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                                  <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy} style={{ fontSize: 11 }}>Pay</button>
+                                  {(() => {
+                                    const tokenKey = emp.salaryToken === 1 ? "cUSDC" : "cUSDT";
+                                    const approved = operatorApproved[tokenKey];
+                                    return (
+                                      <button
+                                        className="btn-primary btn-sm"
+                                        onClick={() => approved ? handlePay(emp.address) : handleApproveOperator(tokenKey)}
+                                        disabled={busy}
+                                        style={{ fontSize: 11, background: approved ? undefined : "var(--warning, #f59e0b)" }}
+                                        title={approved ? undefined : `Approve ${tokenKey} operator first`}
+                                      >
+                                        {approved ? "Pay" : `Approve ${tokenKey}`}
+                                      </button>
+                                    );
+                                  })()}
                                   <button
                                     className="btn-ghost btn-sm"
                                     onClick={() => {
