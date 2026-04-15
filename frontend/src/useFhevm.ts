@@ -81,6 +81,7 @@ export type FhevmState = {
   loading: boolean;
   error: string;
   connect: () => Promise<void>;
+  disconnect: () => void;
 };
 
 export function useFhevm(employerAddress: string): FhevmState {
@@ -170,6 +171,13 @@ export function useFhevm(employerAddress: string): FhevmState {
     return () => window.ethereum?.removeListener("chainChanged", handler);
   }, [connect]);
 
+  const disconnect = useCallback(() => {
+    setAddress("");
+    setProvider(null);
+    setSigner(null);
+    setInstance(null);
+  }, []);
+
   return {
     provider,
     signer,
@@ -179,6 +187,7 @@ export function useFhevm(employerAddress: string): FhevmState {
     loading,
     error,
     connect,
+    disconnect,
   };
 }
 

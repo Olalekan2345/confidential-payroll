@@ -74,8 +74,6 @@ export default function App() {
   const [setupPhase,     setSetupPhase]     = useState<"checking" | "setup" | "ready">("checking");
   const [contractInput,  setContractInput]  = useState("");
   const [deploying,      setDeploying]      = useState(false);
-  const [contractClosed, setContractClosed] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   // Role view — employers can toggle to see the employee panel
   const [viewAs, setViewAs] = useState<"employer" | "employee">("employer");
@@ -97,6 +95,8 @@ export default function App() {
   const [inlineUpdateAddr,   setInlineUpdateAddr]   = useState<string | null>(null);
   const [inlineUpdateSalary, setInlineUpdateSalary] = useState("");
   const [inlineUpdateToken,  setInlineUpdateToken]  = useState<number>(1);
+
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // operator approval state
   const [operatorApproved, setOperatorApproved] = useState<Record<string, boolean>>({});
@@ -267,12 +267,8 @@ export default function App() {
 
   const loadEmployerAddr = async () => {
     try {
-      const [addr, isClosed] = await Promise.all([
-        contract().employer(),
-        contract().closed(),
-      ]);
+      const addr = await contract().employer();
       setEmployerAddr(addr as string);
-      setContractClosed(isClosed as boolean);
     } catch { /* ignore */ }
   };
 
@@ -285,7 +281,7 @@ export default function App() {
           return { address: addr, active: active as boolean, lastPaidAt: Number(lastPaidAt), salaryToken: Number(salaryToken) };
         })
       );
-      setEmployees(rows);
+      setEmployees(rows.filter(r => r.active));
     } catch (e) {
       console.error("loadEmployees failed:", e);
       setEmployees([]);
@@ -339,34 +335,17 @@ export default function App() {
     }
   };
 
-  const handleClosePayroll = async () => {
-    setBusy(true);
-    setStatus(null);
-    setShowCloseConfirm(false);
-    try {
-      const tx = await contract(true).closePayroll();
-      await tx.wait();
-      setContractClosed(true);
-      ok("Payroll closed. No further payments or changes are possible.");
-      await loadBalances();
-    } catch (e: unknown) {
-      fail(e instanceof Error ? e.message : "Close payroll failed");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   // Fully disconnect this wallet from the app (client-side only)
   const handleLogout = () => {
     setPayrollAddress("");
-    setSetupPhase("setup");
+    setSetupPhase("checking");
     setEmployerAddr("");
     setEmployees([]);
     setWalletBalance(null);
     setStatus(null);
-    setContractClosed(false);
-    setShowCloseConfirm(false);
     setViewAs("employer");
+    fhevm.disconnect();
   };
 
   // Convert salary input to token units (cUSDC/cUSDT use 6 decimals)
@@ -587,6 +566,24 @@ export default function App() {
                   {viewAs === "employer" ? "View as Employee" : "View as Employer"}
                 </button>
               )}
+              {fhevm.isEmployer && setupPhase === "ready" && (
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    setPayrollAddress("");
+                    setSetupPhase("setup");
+                    setEmployerAddr("");
+                    setEmployees([]);
+                    setWalletBalance(null);
+                    setStatus(null);
+                    setViewAs("employer");
+                  }}
+                  style={{ fontSize: 11, padding: "4px 10px" }}
+                  title="Leave current contract and create or connect to another"
+                >
+                  + New Contract
+                </button>
+              )}
               {setupPhase === "ready" && (
                 <button
                   className="btn-danger btn-sm"
@@ -768,19 +765,6 @@ export default function App() {
           /* Ready — full app */
           <>
             {/* ── Closed contract banner ── */}
-            {contractClosed && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 10,
-                background: "var(--danger-dim)",
-                border: "1px solid rgba(248,113,113,0.25)",
-                borderRadius: "var(--radius-sm)", padding: "11px 16px", marginBottom: 24,
-                fontSize: 13, color: "var(--danger)",
-              }}>
-                <span>✕</span>
-                This payroll contract has been permanently closed. No further actions are possible.
-              </div>
-            )}
-
             {/* ── Status banner ── */}
             {status && (
               <div style={{
@@ -901,35 +885,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Close Payroll */}
-                      <hr className="divider" />
-                      {!showCloseConfirm ? (
-                        <button
-                          className="btn-danger btn-sm"
-                          onClick={() => setShowCloseConfirm(true)}
-                          disabled={busy || contractClosed}
-                          style={{ fontSize: 12 }}
-                        >
-                          {contractClosed ? "Payroll Closed" : "Close & Delete Payroll"}
-                        </button>
-                      ) : (
-                        <div style={{ background: "var(--danger-dim)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
-                          <p style={{ fontSize: 13, color: "var(--danger)", marginBottom: 12, fontWeight: 600 }}>
-                            Are you sure? This permanently closes the payroll.
-                          </p>
-                          <p style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 14, lineHeight: 1.6 }}>
-                            No further payments or employee changes will be possible after closing.
-                          </p>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button className="btn-danger btn-sm" onClick={handleClosePayroll} disabled={busy}>
-                              Yes, Close Permanently
-                            </button>
-                            <button className="btn-ghost btn-sm" onClick={() => setShowCloseConfirm(false)} disabled={busy}>
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* Add Employee */}
@@ -964,7 +919,7 @@ export default function App() {
                           <label>Monthly salary ({newSalaryToken === 1 ? "cUSDC" : "cUSDT"})</label>
                           <input type="number" placeholder="500" value={newSalary} onChange={e => setNewSalary(e.target.value)} />
                         </div>
-                        <button className="btn-primary" onClick={handleAddEmployee} disabled={busy || !newEmployee || !newSalary || contractClosed} style={{ justifyContent: "center", marginTop: 4 }}>
+                        <button className="btn-primary" onClick={handleAddEmployee} disabled={busy || !newEmployee || !newSalary} style={{ justifyContent: "center", marginTop: 4 }}>
                           Add Employee
                         </button>
                       </div>
@@ -997,7 +952,7 @@ export default function App() {
                               <button
                                 className="btn-primary btn-sm"
                                 onClick={() => handleApproveOperator(sym)}
-                                disabled={approvingOp[sym] || busy || contractClosed}
+                                disabled={approvingOp[sym] || busy}
                               >
                                 {approvingOp[sym] ? "Approving…" : `Approve ${sym}`}
                               </button>
@@ -1020,10 +975,10 @@ export default function App() {
                     </div>
                     {showEmployerView && (
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn-ghost btn-sm" onClick={handlePaySelected} disabled={busy || selectedEmployees.size === 0 || contractClosed}>
+                        <button className="btn-ghost btn-sm" onClick={handlePaySelected} disabled={busy || selectedEmployees.size === 0}>
                           Pay Selected ({selectedEmployees.size})
                         </button>
-                        <button className="btn-primary btn-sm" onClick={handlePayAll} disabled={busy || activeCount === 0 || contractClosed}>
+                        <button className="btn-primary btn-sm" onClick={handlePayAll} disabled={busy || activeCount === 0}>
                           Pay All ({activeCount})
                         </button>
                       </div>
@@ -1049,7 +1004,7 @@ export default function App() {
                         {["Address", "Status", "Token", "Last Paid", "Salary"].map(h => (
                           <div key={h} style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
                         ))}
-                        {showEmployerView && <div />}
+                        {showEmployerView && <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Actions</div>}
                       </div>
 
                       {employees.map((emp, i) => {
@@ -1072,9 +1027,7 @@ export default function App() {
                               transition: "background 0.1s",
                             }}>
                               {showEmployerView && (
-                                emp.active
-                                  ? <input type="checkbox" checked={selectedEmployees.has(emp.address)} onChange={() => toggleSelect(emp.address)} />
-                                  : <div />
+                                <input type="checkbox" checked={selectedEmployees.has(emp.address)} onChange={() => toggleSelect(emp.address)} />
                               )}
                               <code style={{ fontSize: 12 }}>{emp.address}</code>
                               <span className={`tag ${emp.active ? "tag-active" : "tag-inactive"}`}>{emp.active ? "Active" : "Inactive"}</span>
@@ -1129,29 +1082,27 @@ export default function App() {
                               </div>
 
                               {showEmployerView && (
-                                emp.active ? (
-                                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                                    <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy || contractClosed} style={{ fontSize: 11 }}>Pay</button>
-                                    <button
-                                      className="btn-ghost btn-sm"
-                                      onClick={() => {
-                                        if (isEditing) {
-                                          setInlineUpdateAddr(null);
-                                          setInlineUpdateSalary("");
-                                        } else {
-                                          setInlineUpdateAddr(emp.address);
-                                          setInlineUpdateToken(emp.salaryToken === 0 ? 1 : emp.salaryToken);
-                                          setInlineUpdateSalary("");
-                                        }
-                                      }}
-                                      disabled={busy || contractClosed}
-                                      style={{ fontSize: 11 }}
-                                    >
-                                      {isEditing ? "Cancel" : "Edit"}
-                                    </button>
-                                    <button className="btn-danger btn-sm" onClick={() => handleRemove(emp.address)} disabled={busy || contractClosed} style={{ fontSize: 11 }}>Remove</button>
-                                  </div>
-                                ) : <div />
+                                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                  <button className="btn-primary btn-sm" onClick={() => handlePay(emp.address)} disabled={busy} style={{ fontSize: 11 }}>Pay</button>
+                                  <button
+                                    className="btn-ghost btn-sm"
+                                    onClick={() => {
+                                      if (isEditing) {
+                                        setInlineUpdateAddr(null);
+                                        setInlineUpdateSalary("");
+                                      } else {
+                                        setInlineUpdateAddr(emp.address);
+                                        setInlineUpdateToken(emp.salaryToken === 0 ? 1 : emp.salaryToken);
+                                        setInlineUpdateSalary("");
+                                      }
+                                    }}
+                                    disabled={busy}
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    {isEditing ? "Cancel" : "Edit"}
+                                  </button>
+                                  <button className="btn-danger btn-sm" onClick={() => handleRemove(emp.address)} disabled={busy} style={{ fontSize: 11 }}>Remove</button>
+                                </div>
                               )}
                             </div>
 
@@ -1197,7 +1148,7 @@ export default function App() {
                                   <button
                                     className="btn-primary btn-sm"
                                     onClick={() => handleInlineUpdate(emp.address)}
-                                    disabled={busy || !inlineUpdateSalary || contractClosed}
+                                    disabled={busy || !inlineUpdateSalary}
                                     style={{ fontSize: 11, whiteSpace: "nowrap" }}
                                   >
                                     Confirm Update
@@ -1389,10 +1340,12 @@ export default function App() {
                     const url = `${window.location.origin}${window.location.pathname}?payroll=${payrollAddress}`;
                     navigator.clipboard.writeText(url);
                     ok("Employee link copied to clipboard!");
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
                   }}
                   style={{ fontSize: 11 }}
                 >
-                  Share Employee Link
+                  {linkCopied ? "Copied!" : "Share Employee Link"}
                 </button>
               )}
             </div>

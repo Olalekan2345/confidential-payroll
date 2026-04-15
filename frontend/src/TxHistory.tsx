@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Contract, BrowserProvider, EventLog, ethers, Log } from "ethers";
+import { Contract, BrowserProvider, EventLog, Log } from "ethers";
 import { PAYROLL_ABI } from "./contract";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -39,12 +39,11 @@ type TxRow = {
 const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
 const BADGE: Record<string, { bg: string; color: string; border: string }> = {
-  "Payroll Funded":    { bg: "#fffbe6", color: "#92400e", border: "rgba(255,210,8,0.4)" },
   "Employee Added":    { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-  "Salary Updated":   { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" },
-  "Salary Paid":      { bg: "#fffbe6", color: "#92400e", border: "rgba(255,210,8,0.4)" },
-  "Employee Removed": { bg: "#fef2f2", color: "#dc2626", border: "#fecaca" },
-  "Payroll Withdrawn":{ bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+  "Salary Updated":    { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" },
+  "Salary Paid":       { bg: "#fffbe6", color: "#92400e", border: "rgba(255,210,8,0.4)" },
+  "Employee Removed":  { bg: "#fef2f2", color: "#dc2626", border: "#fecaca" },
+  "Payroll Closed":    { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -96,45 +95,25 @@ export function TxHistory({
           ...added.map(log => toRow(log as EventLog, "Employee Added", "You were added to payroll")),
           ...removed.map(log => toRow(log as EventLog, "Employee Removed", "You were removed from payroll")),
           ...updated.map(log => toRow(log as EventLog, "Salary Updated", "Your salary was updated")),
-          ...paid.map(log => {
-            const e = log as EventLog;
-            const amt = e.args[1]
-              ? `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH received`
-              : "Salary received";
-            return toRow(e, "Salary Paid", amt);
-          }),
+          ...paid.map(log => toRow(log as EventLog, "Salary Paid", "Confidential salary received")),
         ].sort((a, b) => b.blockNumber - a.blockNumber);
 
       } else {
         // ── Employer view: all events ──────────────────────────────────────
-        const [funded, added, removed, updated, paid, withdrawn] = await Promise.all([
-          queryChunked(c, "PayrollFunded",    fromBlock, currentBlock),
-          queryChunked(c, "EmployeeAdded",    fromBlock, currentBlock),
-          queryChunked(c, "EmployeeRemoved",  fromBlock, currentBlock),
-          queryChunked(c, "SalaryUpdated",    fromBlock, currentBlock),
-          queryChunked(c, "SalaryPaid",       fromBlock, currentBlock),
-          queryChunked(c, "PayrollWithdrawn", fromBlock, currentBlock),
+        const [added, removed, updated, paid, closed] = await Promise.all([
+          queryChunked(c, c.filters.EmployeeAdded(),   fromBlock, currentBlock),
+          queryChunked(c, c.filters.EmployeeRemoved(), fromBlock, currentBlock),
+          queryChunked(c, c.filters.SalaryUpdated(),   fromBlock, currentBlock),
+          queryChunked(c, c.filters.SalaryPaid(),      fromBlock, currentBlock),
+          queryChunked(c, c.filters.PayrollClosed(),   fromBlock, currentBlock),
         ]);
 
         all = [
-          ...funded.map(log => {
-            const e = log as EventLog;
-            return toRow(e, "Payroll Funded",
-              `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH deposited`);
-          }),
           ...added.map(log => toRow(log as EventLog, "Employee Added", short((log as EventLog).args[0] as string))),
           ...removed.map(log => toRow(log as EventLog, "Employee Removed", short((log as EventLog).args[0] as string))),
           ...updated.map(log => toRow(log as EventLog, "Salary Updated", short((log as EventLog).args[0] as string))),
-          ...paid.map(log => {
-            const e = log as EventLog;
-            const amt = e.args[1] ? ` · ${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH` : "";
-            return toRow(e, "Salary Paid", `${short(e.args[0] as string)}${amt}`);
-          }),
-          ...withdrawn.map(log => {
-            const e = log as EventLog;
-            return toRow(e, "Payroll Withdrawn",
-              `${parseFloat(ethers.formatEther(e.args[1] as bigint)).toFixed(4)} ETH withdrawn`);
-          }),
+          ...paid.map(log => toRow(log as EventLog, "Salary Paid", `${short((log as EventLog).args[0] as string)} · confidential amount`)),
+          ...closed.map(log => toRow(log as EventLog, "Payroll Closed", "Contract closed by employer")),
         ].sort((a, b) => b.blockNumber - a.blockNumber);
       }
 
