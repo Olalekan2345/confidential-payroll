@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 
-const CONF_USDC = "0x38E95FcD94A48DB23B0Cc809478aA7fc35B9Fe76";
-const CONF_USDT = "0x98F9E847057c2918E234504c70d950B60E8a9416";
+const CONF_USDC = "0xD50988540B8808ccC9b102009B4282B433E1ff2D";
+const CONF_USDT = "0x7B57AdDf2361f0C1D7BB6CC342572954c1a56888";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, network } = hre;

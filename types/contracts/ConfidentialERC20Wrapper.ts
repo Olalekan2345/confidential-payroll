@@ -30,18 +30,25 @@ export interface ConfidentialERC20WrapperInterface extends Interface {
       | "balanceOf"
       | "confidentialProtocolId"
       | "decimals"
+      | "finalizeUnwrap"
       | "isOperatorApproved"
       | "name"
       | "operatorTransfer"
+      | "requestUnwrap"
       | "symbol"
       | "transfer"
       | "underlying"
-      | "unwrap"
+      | "unwrapRequests"
       | "wrap"
   ): FunctionFragment;
 
   getEvent(
-    nameOrSignatureOrTopic: "Transfer" | "Unwrap" | "Wrap"
+    nameOrSignatureOrTopic:
+      | "PublicDecryptionVerified"
+      | "Transfer"
+      | "UnwrapFinalized"
+      | "UnwrapRequested"
+      | "Wrap"
   ): EventFragment;
 
   encodeFunctionData(
@@ -58,6 +65,10 @@ export interface ConfidentialERC20WrapperInterface extends Interface {
   ): string;
   encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "finalizeUnwrap",
+    values: [BytesLike, BytesLike[], BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "isOperatorApproved",
     values: [AddressLike, AddressLike]
   ): string;
@@ -65,6 +76,10 @@ export interface ConfidentialERC20WrapperInterface extends Interface {
   encodeFunctionData(
     functionFragment: "operatorTransfer",
     values: [AddressLike, AddressLike, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "requestUnwrap",
+    values: [AddressLike, AddressLike, BytesLike, BytesLike]
   ): string;
   encodeFunctionData(functionFragment: "symbol", values?: undefined): string;
   encodeFunctionData(
@@ -76,8 +91,8 @@ export interface ConfidentialERC20WrapperInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "unwrap",
-    values: [BigNumberish]
+    functionFragment: "unwrapRequests",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(functionFragment: "wrap", values: [BigNumberish]): string;
 
@@ -92,6 +107,10 @@ export interface ConfidentialERC20WrapperInterface extends Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "decimals", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "finalizeUnwrap",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "isOperatorApproved",
     data: BytesLike
   ): Result;
@@ -100,11 +119,37 @@ export interface ConfidentialERC20WrapperInterface extends Interface {
     functionFragment: "operatorTransfer",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "requestUnwrap",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "symbol", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "transfer", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "underlying", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "unwrap", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "unwrapRequests",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "wrap", data: BytesLike): Result;
+}
+
+export namespace PublicDecryptionVerifiedEvent {
+  export type InputTuple = [
+    handlesList: BytesLike[],
+    abiEncodedCleartexts: BytesLike
+  ];
+  export type OutputTuple = [
+    handlesList: string[],
+    abiEncodedCleartexts: string
+  ];
+  export interface OutputObject {
+    handlesList: string[];
+    abiEncodedCleartexts: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace TransferEvent {
@@ -120,12 +165,43 @@ export namespace TransferEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace UnwrapEvent {
-  export type InputTuple = [account: AddressLike, amount: BigNumberish];
-  export type OutputTuple = [account: string, amount: bigint];
+export namespace UnwrapFinalizedEvent {
+  export type InputTuple = [
+    receiver: AddressLike,
+    requestId: BytesLike,
+    amount: BigNumberish
+  ];
+  export type OutputTuple = [
+    receiver: string,
+    requestId: string,
+    amount: bigint
+  ];
   export interface OutputObject {
-    account: string;
+    receiver: string;
+    requestId: string;
     amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace UnwrapRequestedEvent {
+  export type InputTuple = [
+    receiver: AddressLike,
+    requestId: BytesLike,
+    encHandle: BytesLike
+  ];
+  export type OutputTuple = [
+    receiver: string,
+    requestId: string,
+    encHandle: string
+  ];
+  export interface OutputObject {
+    receiver: string;
+    requestId: string;
+    encHandle: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -201,6 +277,17 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
 
   decimals: TypedContractMethod<[], [bigint], "view">;
 
+  finalizeUnwrap: TypedContractMethod<
+    [
+      requestId: BytesLike,
+      handles: BytesLike[],
+      abiEncodedCleartexts: BytesLike,
+      decryptionProof: BytesLike
+    ],
+    [void],
+    "nonpayable"
+  >;
+
   isOperatorApproved: TypedContractMethod<
     [operator: AddressLike, owner: AddressLike],
     [boolean],
@@ -215,6 +302,17 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
     "nonpayable"
   >;
 
+  requestUnwrap: TypedContractMethod<
+    [
+      from: AddressLike,
+      to: AddressLike,
+      encAmount: BytesLike,
+      inputProof: BytesLike
+    ],
+    [string],
+    "nonpayable"
+  >;
+
   symbol: TypedContractMethod<[], [string], "view">;
 
   transfer: TypedContractMethod<
@@ -225,7 +323,17 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
 
   underlying: TypedContractMethod<[], [string], "view">;
 
-  unwrap: TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
+  unwrapRequests: TypedContractMethod<
+    [arg0: BytesLike],
+    [
+      [string, string, boolean] & {
+        receiver: string;
+        encHandle: string;
+        finalized: boolean;
+      }
+    ],
+    "view"
+  >;
 
   wrap: TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
 
@@ -250,6 +358,18 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
     nameOrSignature: "decimals"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
+    nameOrSignature: "finalizeUnwrap"
+  ): TypedContractMethod<
+    [
+      requestId: BytesLike,
+      handles: BytesLike[],
+      abiEncodedCleartexts: BytesLike,
+      decryptionProof: BytesLike
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "isOperatorApproved"
   ): TypedContractMethod<
     [operator: AddressLike, owner: AddressLike],
@@ -267,6 +387,18 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "requestUnwrap"
+  ): TypedContractMethod<
+    [
+      from: AddressLike,
+      to: AddressLike,
+      encAmount: BytesLike,
+      inputProof: BytesLike
+    ],
+    [string],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "symbol"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
@@ -280,12 +412,29 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
     nameOrSignature: "underlying"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
-    nameOrSignature: "unwrap"
-  ): TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
+    nameOrSignature: "unwrapRequests"
+  ): TypedContractMethod<
+    [arg0: BytesLike],
+    [
+      [string, string, boolean] & {
+        receiver: string;
+        encHandle: string;
+        finalized: boolean;
+      }
+    ],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "wrap"
   ): TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
 
+  getEvent(
+    key: "PublicDecryptionVerified"
+  ): TypedContractEvent<
+    PublicDecryptionVerifiedEvent.InputTuple,
+    PublicDecryptionVerifiedEvent.OutputTuple,
+    PublicDecryptionVerifiedEvent.OutputObject
+  >;
   getEvent(
     key: "Transfer"
   ): TypedContractEvent<
@@ -294,11 +443,18 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
     TransferEvent.OutputObject
   >;
   getEvent(
-    key: "Unwrap"
+    key: "UnwrapFinalized"
   ): TypedContractEvent<
-    UnwrapEvent.InputTuple,
-    UnwrapEvent.OutputTuple,
-    UnwrapEvent.OutputObject
+    UnwrapFinalizedEvent.InputTuple,
+    UnwrapFinalizedEvent.OutputTuple,
+    UnwrapFinalizedEvent.OutputObject
+  >;
+  getEvent(
+    key: "UnwrapRequested"
+  ): TypedContractEvent<
+    UnwrapRequestedEvent.InputTuple,
+    UnwrapRequestedEvent.OutputTuple,
+    UnwrapRequestedEvent.OutputObject
   >;
   getEvent(
     key: "Wrap"
@@ -309,6 +465,17 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
   >;
 
   filters: {
+    "PublicDecryptionVerified(bytes32[],bytes)": TypedContractEvent<
+      PublicDecryptionVerifiedEvent.InputTuple,
+      PublicDecryptionVerifiedEvent.OutputTuple,
+      PublicDecryptionVerifiedEvent.OutputObject
+    >;
+    PublicDecryptionVerified: TypedContractEvent<
+      PublicDecryptionVerifiedEvent.InputTuple,
+      PublicDecryptionVerifiedEvent.OutputTuple,
+      PublicDecryptionVerifiedEvent.OutputObject
+    >;
+
     "Transfer(address,address)": TypedContractEvent<
       TransferEvent.InputTuple,
       TransferEvent.OutputTuple,
@@ -320,15 +487,26 @@ export interface ConfidentialERC20Wrapper extends BaseContract {
       TransferEvent.OutputObject
     >;
 
-    "Unwrap(address,uint256)": TypedContractEvent<
-      UnwrapEvent.InputTuple,
-      UnwrapEvent.OutputTuple,
-      UnwrapEvent.OutputObject
+    "UnwrapFinalized(address,bytes32,uint64)": TypedContractEvent<
+      UnwrapFinalizedEvent.InputTuple,
+      UnwrapFinalizedEvent.OutputTuple,
+      UnwrapFinalizedEvent.OutputObject
     >;
-    Unwrap: TypedContractEvent<
-      UnwrapEvent.InputTuple,
-      UnwrapEvent.OutputTuple,
-      UnwrapEvent.OutputObject
+    UnwrapFinalized: TypedContractEvent<
+      UnwrapFinalizedEvent.InputTuple,
+      UnwrapFinalizedEvent.OutputTuple,
+      UnwrapFinalizedEvent.OutputObject
+    >;
+
+    "UnwrapRequested(address,bytes32,bytes32)": TypedContractEvent<
+      UnwrapRequestedEvent.InputTuple,
+      UnwrapRequestedEvent.OutputTuple,
+      UnwrapRequestedEvent.OutputObject
+    >;
+    UnwrapRequested: TypedContractEvent<
+      UnwrapRequestedEvent.InputTuple,
+      UnwrapRequestedEvent.OutputTuple,
+      UnwrapRequestedEvent.OutputObject
     >;
 
     "Wrap(address,uint256)": TypedContractEvent<

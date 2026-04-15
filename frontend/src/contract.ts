@@ -1,5 +1,5 @@
 // ─── Factory ──────────────────────────────────────────────────────────────────
-export const FACTORY_ADDRESS = "0x616F1e291E77F518D7E6f0706c3473FF18ACF3bB";
+export const FACTORY_ADDRESS = "0xC860cb3eafaE1ebeB6E7A40EF7DE576f39681326";
 
 export const FACTORY_ABI = [
   "function create() returns (address)",
@@ -17,13 +17,12 @@ export const PAYROLL_ABI = [
   "function confUsdtAddress() view returns (address)",
   "function fundPayroll() payable",
   "function closePayroll()",
-  // token: 0=ETH, 1=cUSDC, 2=cUSDT
+  // token: 1=cUSDC, 2=cUSDT
   "function addEmployee(address employee, uint8 token, uint256 salaryWei, bytes32 encSalary, bytes calldata inputProof)",
   "function updateSalary(address employee, uint8 token, uint256 newSalaryWei, bytes32 encNewSalary, bytes calldata inputProof)",
   "function removeEmployee(address employee)",
   "function paySalary(address employee)",
   "function payAll()",
-  "function withdrawSurplus(uint256 amount)",
   "function getMySalary() view returns (bytes32)",
   "function getMyTotalPaid() view returns (bytes32)",
   "function getEmployeeList() view returns (address[])",
@@ -32,18 +31,16 @@ export const PAYROLL_ABI = [
   "event EmployeeAdded(address indexed employee)",
   "event EmployeeRemoved(address indexed employee)",
   "event SalaryUpdated(address indexed employee)",
-  "event PayrollFunded(address indexed funder, uint256 amount)",
   "event SalaryPaid(address indexed employee, uint256 amount, uint256 timestamp)",
-  "event PayrollWithdrawn(address indexed employer, uint256 amount)",
   "event PayrollClosed(address indexed employer, uint256 refunded)",
 ] as const;
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
-export const MOCK_USDC_ADDRESS = "0xaF56671C880550241bDB5EAE1A3Fa8C4035E3e06";
-export const MOCK_USDT_ADDRESS = "0x1777F3f0a806Dfb9eda860dF4C2267Fd45F6D69b";
-export const CONF_USDC_ADDRESS = "0x38E95FcD94A48DB23B0Cc809478aA7fc35B9Fe76";
-export const CONF_USDT_ADDRESS = "0x98F9E847057c2918E234504c70d950B60E8a9416";
+export const MOCK_USDC_ADDRESS = "0x18d3cB901F4715f51C8E252b92fec7F430359066";
+export const MOCK_USDT_ADDRESS = "0x0935D261D85478d7AaF62Bc6da902a219aA04E0E";
+export const CONF_USDC_ADDRESS = "0xD50988540B8808ccC9b102009B4282B433E1ff2D";
+export const CONF_USDT_ADDRESS = "0x7B57AdDf2361f0C1D7BB6CC342572954c1a56888";
 
 export const ERC20_ABI = [
   "function name() view returns (string)",
@@ -62,14 +59,18 @@ export const CONF_ERC20_ABI = [
   "function decimals() view returns (uint8)",
   "function underlying() view returns (address)",
   "function wrap(uint64 amount)",
-  "function unwrap(uint64 amount)",
+  // Two-step async unwrap (Zama protocol pattern)
+  "function requestUnwrap(address from, address to, bytes32 encAmount, bytes calldata inputProof) returns (bytes32 requestId)",
+  "function finalizeUnwrap(bytes32 requestId, bytes32[] calldata handles, bytes calldata abiEncodedCleartexts, bytes calldata decryptionProof)",
+  "function unwrapRequests(bytes32 requestId) view returns (address receiver, bytes32 encHandle, bool finalized)",
   "function transfer(address to, bytes32 encAmount, bytes calldata inputProof)",
   "function approveOperator(address operator, bool approved)",
   "function isOperatorApproved(address operator, address owner) view returns (bool)",
   "function operatorTransfer(address from, address to, bytes32 amount)",
   "function balanceOf(address account) view returns (bytes32)",
   "event Wrap(address indexed account, uint256 amount)",
-  "event Unwrap(address indexed account, uint256 amount)",
+  "event UnwrapRequested(address indexed receiver, bytes32 indexed requestId, bytes32 encHandle)",
+  "event UnwrapFinalized(address indexed receiver, bytes32 indexed requestId, uint64 amount)",
   "event Transfer(address indexed from, address indexed to)",
 ] as const;
 

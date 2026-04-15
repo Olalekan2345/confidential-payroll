@@ -164,18 +164,74 @@ export function SwapTab({
     } finally { setBusy(false); }
   };
 
-  // ── Unwrap ─────────────────────────────────────────────────────────────────
+  // ── Unwrap (two-step async, per Zama protocol) ─────────────────────────────
   const handleUnwrap = async () => {
     if (!amount || parseFloat(amount) <= 0) return fail("Enter an amount.");
     setBusy(true); setStatus(null);
+
     try {
       const parsed = ethers.parseUnits(amount, selectedToken.decimals);
       const cToken = new Contract(selectedToken.confAddress, CONF_ERC20_ABI, signer);
 
-      const tx = await cToken.unwrap(BigInt(parsed.toString()));
-      await tx.wait();
+      // ── Step 1: Encrypt the amount and submit the unwrap request ─────────────
+      setStatus({ text: "Step 1/2 — Encrypting and submitting unwrap request…", ok: true });
 
-      ok(`Unwrapped ${amount} ${selectedToken.confSymbol} → ${selectedToken.symbol}`);
+      const input    = instance.createEncryptedInput(selectedToken.confAddress, address);
+      const zkProof  = input.add64(parsed).generateZKProof();
+      const { handles, inputProof } = await instance.requestZKProofVerification(zkProof);
+
+      const tx1     = await cToken.requestUnwrap(address, address, handles[0], inputProof);
+      const receipt = await tx1.wait();
+
+      // Parse UnwrapRequested event to get requestId + encHandle
+      const iface = new ethers.Interface(CONF_ERC20_ABI as unknown as string[]);
+      let requestId = "";
+      let encHandle = "";
+      for (const log of receipt.logs) {
+        try {
+          const parsed_log = iface.parseLog(log);
+          if (parsed_log?.name === "UnwrapRequested") {
+            requestId = parsed_log.args[1] as string;
+            encHandle = parsed_log.args[2] as string;
+            break;
+          }
+        } catch { /* skip unrelated logs */ }
+      }
+      if (!requestId || !encHandle) throw new Error("UnwrapRequested event not found in receipt");
+
+      // ── Step 2: Poll KMS for the public decryption result ────────────────────
+      setStatus({ text: "Step 2/2 — Waiting for KMS decryption (may take ~30 s, please wait)…", ok: true });
+
+      let decryptResult = null;
+      const MAX_ATTEMPTS = 24; // 24 × 5 s = 2 min max
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+          decryptResult = await instance.publicDecrypt([encHandle]);
+          break; // success — exit polling loop
+        } catch (e: unknown) {
+          const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+          if (msg.includes("not_ready") || msg.includes("not ready")) {
+            // KMS not yet ready — wait and retry
+            await new Promise(r => setTimeout(r, 5000));
+          } else {
+            throw e; // unexpected error — bubble up
+          }
+        }
+      }
+      if (!decryptResult) throw new Error("KMS decryption timed out. Try finalizing later.");
+
+      // ── Step 3: Finalize the unwrap with the KMS proof ───────────────────────
+      setStatus({ text: "Step 2/2 — Finalizing unwrap on-chain…", ok: true });
+
+      const tx2 = await cToken.finalizeUnwrap(
+        requestId,
+        [encHandle],
+        decryptResult.abiEncodedClearValues,
+        decryptResult.decryptionProof,
+      );
+      await tx2.wait();
+
+      ok(`✓ Unwrapped ${amount} ${selectedToken.confSymbol} → ${selectedToken.symbol}. Check your USDC/USDT balance.`);
       setAmount("");
       await loadPlainBalance(selectedToken);
       await decryptConfBalance(selectedToken);
@@ -342,8 +398,9 @@ export function SwapTab({
             </span>
           ) : (
             <span>
-              <strong>Unwrap</strong> burns your encrypted {selectedToken.confSymbol} balance and returns {selectedToken.symbol} to your wallet.
-              First click "Reveal Balance" above to see how much you hold, then enter that amount to unwrap.
+              <strong>Unwrap</strong> is a two-step process: (1) your encrypted {selectedToken.confSymbol} is burned and the
+              amount is sent to the KMS for decryption, (2) once decrypted (~30 s) the equivalent {selectedToken.symbol}
+              is returned to your wallet. First reveal your balance above, then enter the amount to unwrap.
             </span>
           )}
         </div>
