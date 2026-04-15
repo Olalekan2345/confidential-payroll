@@ -1,13 +1,16 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 
-const CONF_USDC = "0xC4D1f2Dc5929D79c20AC4A2bfc6dae5403f5B102";
-const CONF_USDT = "0x5eEaf21b6b4c7EE21970c7C8ffB428C5f7c70c56";
-
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, network } = hre;
-  const { deploy, log } = deployments;
+  const { deploy, log, get } = deployments;
   const { deployer } = await getNamedAccounts();
+
+  // Read cUSDC / cUSDT addresses from the token deployment (03_deploy_tokens.ts)
+  const cUsdcDeployment = await get("ConfidentialUSDC");
+  const cUsdtDeployment = await get("ConfidentialUSDT");
+  const CONF_USDC = cUsdcDeployment.address;
+  const CONF_USDT = cUsdtDeployment.address;
 
   log("─────────────────────────────────────────────────");
   log(`Deploying ConfidentialPayrollFactory on network: ${network.name}`);
@@ -27,5 +30,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 func.tags = ["ConfidentialPayrollFactory"];
-func.dependencies = ["ConfidentialPayroll"];
+func.dependencies = ["ConfidentialPayroll", "Tokens"];
 export default func;
