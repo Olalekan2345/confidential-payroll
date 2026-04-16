@@ -80,7 +80,9 @@ export function SwapTab({
       const cToken = new Contract(t.confAddress, CONF_ERC20_ABI, provider);
       const handle: string = await cToken.balanceOf(address);
 
-      if (!handle || handle === "0x" + "0".repeat(64)) {
+      // Zero handle means no balance has ever been set for this address
+      const isZeroHandle = !handle || BigInt(handle) === 0n;
+      if (isZeroHandle) {
         setTokenStates(prev => ({
           ...prev,
           [t.symbol]: { ...state(t), confBalance: "0.00", confHandle: handle },
@@ -113,8 +115,12 @@ export function SwapTab({
           confHandle:  handle,
         },
       }));
-    } catch (e) {
-      fail(e instanceof Error ? e.message : "Decrypt failed");
+    } catch (e: unknown) {
+      console.error("decryptConfBalance error:", e);
+      // Unwrap the SDK's wrapper to show the actual underlying error
+      const root = (e instanceof Error && e.cause instanceof Error) ? e.cause : e;
+      const msg  = root instanceof Error ? root.message : "Decrypt failed";
+      fail(msg);
     } finally {
       setDecrypting(prev => ({ ...prev, [t.symbol]: false }));
     }
