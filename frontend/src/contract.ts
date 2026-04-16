@@ -1,5 +1,5 @@
 // ─── Factory ──────────────────────────────────────────────────────────────────
-export const FACTORY_ADDRESS = "0x04663d27697a1ade97968D087d5b77A9ACe3C2c8";
+export const FACTORY_ADDRESS = "0x4a1D18579C988D577120189E9E4FB21d935D1E14";
 
 export const FACTORY_ABI = [
   "function create() returns (address)",
@@ -37,10 +37,10 @@ export const PAYROLL_ABI = [
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
-export const MOCK_USDC_ADDRESS = "0x186Cdd9d59Bda104Ae6a44aE8772a541bBd34B81";
-export const MOCK_USDT_ADDRESS = "0xE33d06EbA8CCf99c7a082bEB4E9ce7fE9116f71E";
-export const CONF_USDC_ADDRESS = "0x3D9B9f5b04C5E0e7D6CD8B3F4e76128D63b6b024";
-export const CONF_USDT_ADDRESS = "0x7e4b841AF33c36cE827deA130f8754bD366B2720";
+export const MOCK_USDC_ADDRESS = "0x71632025fF08b298b2741984280214D18d40e80d";
+export const MOCK_USDT_ADDRESS = "0xDb4596092450aF25b06E1A73FaAc3C22F249A54D";
+export const CONF_USDC_ADDRESS = "0xB02bA4ad008aA6627AAaF39d11f33c6011bF3F58";
+export const CONF_USDT_ADDRESS = "0x56796BD1d3F3C767a1EA59155468eE2129066C68";
 
 export const ERC20_ABI = [
   "function name() view returns (string)",

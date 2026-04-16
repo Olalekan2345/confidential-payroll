@@ -54,6 +54,7 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
     }
 
     mapping(address => Employee) private _employees;
+    mapping(address => bool)     private _inList;   // true once address is pushed to _employeeList
     address[] private _employeeList;
 
     // ─── Events ───────────────────────────────────────────────────────────────
@@ -121,7 +122,10 @@ contract ConfidentialPayroll is ZamaEthereumConfig {
             FHE.allow(salary, _tokenAddr(token)); // allow cToken contract to use the handle
         }
 
-        _employeeList.push(employee);
+        if (!_inList[employee]) {
+            _employeeList.push(employee);
+            _inList[employee] = true;
+        }
         emit EmployeeAdded(employee);
     }
 
