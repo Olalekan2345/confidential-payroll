@@ -566,22 +566,19 @@ export default function App() {
                   {viewAs === "employer" ? "View as Employee" : "View as Employer"}
                 </button>
               )}
-              {fhevm.isEmployer && setupPhase === "ready" && (
+              {fhevm.isEmployer && setupPhase === "ready" && payrollAddress && (
                 <button
                   className="btn-ghost btn-sm"
                   onClick={() => {
-                    setPayrollAddress("");
-                    setSetupPhase("setup");
-                    setEmployerAddr("");
-                    setEmployees([]);
-                    setWalletBalance(null);
-                    setStatus(null);
-                    setViewAs("employer");
+                    const url = `${window.location.origin}${window.location.pathname}?payroll=${payrollAddress}`;
+                    navigator.clipboard.writeText(url);
+                    ok("Employee link copied to clipboard!");
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
                   }}
                   style={{ fontSize: 11, padding: "4px 10px" }}
-                  title="Leave current contract and create or connect to another"
                 >
-                  + New Contract
+                  {linkCopied ? "Copied!" : "Share Employee Link"}
                 </button>
               )}
               {setupPhase === "ready" && (
@@ -1347,21 +1344,6 @@ export default function App() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "var(--muted)" }}>
               <span>Contract: <code>{short(payrollAddress)}</code></span>
               <a href={`https://sepolia.etherscan.io/address/${payrollAddress}`} target="_blank" rel="noreferrer" style={{ color: "var(--text-2)", borderBottomColor: "var(--border)" }}>Etherscan ↗</a>
-              {showEmployerView && (
-                <button
-                  className="btn-ghost btn-sm"
-                  onClick={() => {
-                    const url = `${window.location.origin}${window.location.pathname}?payroll=${payrollAddress}`;
-                    navigator.clipboard.writeText(url);
-                    ok("Employee link copied to clipboard!");
-                    setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 2000);
-                  }}
-                  style={{ fontSize: 11 }}
-                >
-                  {linkCopied ? "Copied!" : "Share Employee Link"}
-                </button>
-              )}
             </div>
           )}
         </div>
