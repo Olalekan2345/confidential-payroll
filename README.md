@@ -1,7 +1,6 @@
 # ZecurePay — Confidential Payroll on Zama FHEVM
 
-> On-chain payroll with fully encrypted salaries, powered by [Zama FHEVM](https://zama.ai).  
-> Submitted to the **Zama Developer Program — Season 2, Builder Track**.
+> On-chain payroll with fully encrypted salaries, powered by [Zama FHEVM](https://zama.ai).
 
 🔗 **Live demo:** [confidential-payroll-alpha.vercel.app](https://confidential-payroll-alpha.vercel.app)
 
