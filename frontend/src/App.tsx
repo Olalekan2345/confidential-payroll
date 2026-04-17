@@ -85,8 +85,24 @@ export default function App() {
   const [walletBalance,     setWalletBalance]     = useState<string | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
 
+  // employee names stored in localStorage (payrollAddress:employeeAddress → name)
+  const [empNames, setEmpNames] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("empNames") || "{}"); } catch { return {}; }
+  });
+
+  const saveEmpName = (payroll: string, addr: string, name: string) => {
+    const key = `${payroll.toLowerCase()}:${addr.toLowerCase()}`;
+    const next = { ...empNames, [key]: name };
+    setEmpNames(next);
+    localStorage.setItem("empNames", JSON.stringify(next));
+  };
+
+  const getEmpName = (addr: string) =>
+    empNames[`${payrollAddress.toLowerCase()}:${addr.toLowerCase()}`] ?? "";
+
   // form fields
   const [newEmployee,    setNewEmployee]    = useState("");
+  const [newEmployeeName, setNewEmployeeName] = useState("");
   const [newSalary,      setNewSalary]      = useState("");
   const [newSalaryToken, setNewSalaryToken] = useState<number>(1); // 1=cUSDC,2=cUSDT
 
@@ -360,7 +376,8 @@ export default function App() {
       const { handles, inputProof } = await fhevm.instance.requestZKProofVerification(zkProof);
       const tx = await contract(true).addEmployee(newEmployee, newSalaryToken, 0n, handles[0], inputProof);
       await tx.wait();
-      setNewEmployee(""); setNewSalary("");
+      if (newEmployeeName.trim()) saveEmpName(payrollAddress, newEmployee, newEmployeeName.trim());
+      setNewEmployee(""); setNewSalary(""); setNewEmployeeName("");
     });
 
   const handleInlineUpdate = (addr: string) =>
@@ -889,6 +906,10 @@ export default function App() {
                       <h3 style={{ marginBottom: 16 }}>Add Employee</h3>
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         <div>
+                          <label>Name <span style={{ color: "var(--muted)", fontWeight: 400 }}>(optional)</span></label>
+                          <input placeholder="e.g. John Doe" value={newEmployeeName} onChange={e => setNewEmployeeName(e.target.value)} />
+                        </div>
+                        <div>
                           <label>Wallet address</label>
                           <input placeholder="0x…" value={newEmployee} onChange={e => setNewEmployee(e.target.value)} />
                         </div>
@@ -1026,7 +1047,14 @@ export default function App() {
                               {showEmployerView && (
                                 <input type="checkbox" checked={selectedEmployees.has(emp.address)} onChange={() => toggleSelect(emp.address)} />
                               )}
-                              <code style={{ fontSize: 12 }}>{emp.address}</code>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                                {getEmpName(emp.address) && (
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {getEmpName(emp.address)}
+                                  </span>
+                                )}
+                                <code style={{ fontSize: 11, color: "var(--text-2)" }}>{emp.address}</code>
+                              </div>
                               <span className={`tag ${emp.active ? "tag-active" : "tag-inactive"}`}>{emp.active ? "Active" : "Inactive"}</span>
 
                               {/* Token badge */}
