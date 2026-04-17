@@ -1040,7 +1040,7 @@ export default function App() {
                             <div style={{
                               display: "grid",
                               gridTemplateColumns: showEmployerView ? "28px 1fr 90px 72px 150px 160px 190px" : "1fr 90px 72px 150px 160px",
-                              gap: "0 12px", padding: "12px 16px", alignItems: "center",
+                              gap: "0 12px", padding: "12px 16px", alignItems: "flex-start",
                               background: selectedEmployees.has(emp.address) ? "rgba(255,209,0,0.03)" : isEditing ? "var(--bg-alt)" : "transparent",
                               transition: "background 0.1s",
                             }}>
