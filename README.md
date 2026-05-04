@@ -78,7 +78,7 @@ No salary is ever visible in a transaction, in contract storage, or on a block e
 - **Add employees** — encrypted salary set client-side, never plaintext on-chain
 - **Pay one or pay all** — salary transfers are confidential cUSDC/cUSDT `operatorTransfer` calls
 - **Update salary** — re-encrypt and replace salary without downtime
-- **Remove employees** — deactivates without data loss; re-adding reuses slot
+- **Remove employees** — permanently removes employee from the payroll list
 - **Decrypt salary** — employer can reveal any employee's salary locally via re-encryption
 - **Share employee link** — one-click link pre-fills contract address for employees
 
@@ -208,10 +208,16 @@ Step 3 — finalizeUnwrap()
 
 ### 5. Client-side re-encryption for wallet decryption
 
+Each wallet decrypts its own salary locally. The contract returns an encrypted handle; the SDK re-encrypts it under the user's wallet key so the plaintext never leaves the browser.
+
 ```typescript
-const input = instance.createEncryptedInput(contractAddress, userAddress);
-const zkProof = input.add64(salaryAmount).generateZKProof();
-const { handles, inputProof } = await instance.requestZKProofVerification(zkProof);
+const keypair = instance.generateKeypair();
+const eip712 = instance.createEIP712(keypair.publicKey, contractAddress);
+const sig = await signer.signTypedData(eip712.domain, eip712.types, eip712.message);
+const result = await instance.userDecrypt(
+  handle, keypair.privateKey, keypair.publicKey, sig, contractAddress, userAddress
+);
+// result is the plaintext salary — only visible in this browser session
 ```
 
 ---
@@ -279,9 +285,9 @@ Open [http://localhost:5173](http://localhost:5173) in a MetaMask-enabled browse
 1. Connect MetaMask (Sepolia)
 2. Click **Deploy New Payroll** — creates your private payroll contract
 3. Go to **⇄ Swap** tab → mint test USDC → wrap to cUSDC/cUSDT
-4. In **Token Approvals**, approve the payroll contract as operator for cUSDC and/or cUSDT
-5. Add employees with an encrypted salary in cUSDC or cUSDT
-6. Click **Pay** on any employee (or **Pay All**)
+4. Add employees with an encrypted salary in cUSDC or cUSDT
+5. Click **Pay** on any employee — if the payroll contract isn't yet approved as an operator, the button will prompt you to approve first (one-time per token), then pay
+6. Or click **Pay All** to pay every active employee at once
 7. Share the employee link so employees can view their salary
 
 ### As Employee
