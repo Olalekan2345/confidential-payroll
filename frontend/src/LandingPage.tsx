@@ -187,14 +187,29 @@ export function LandingPage({ onConnect, loading, error, dark, toggleDark }: {
         />
 
         <motion.div style={{ position: "relative", zIndex: 5, textAlign: "center", maxWidth: 780, padding: "0 28px" }}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }} style={{ marginBottom: 24 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,210,8,0.08)", border: "1px solid rgba(255,210,8,0.22)", borderRadius: 999, padding: "6px 16px" }}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#FFD208", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
+
+          {/* ── Logo mark + project name ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginBottom: 32 }}
+          >
+            <div style={{
+              width: 64, height: 64, borderRadius: 18,
+              background: "#FFD208",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              boxShadow: "0 8px 32px rgba(255,210,8,0.4)",
+            }}>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontFamily: "'Varela Round', system-ui, sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 400, color: th.text, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
+                ZecurePay
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: dark ? "#FFD208" : "#b45309", letterSpacing: "0.1em" }}>POWERED BY ZAMA FHEVM</span>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, background: "rgba(255,210,8,0.08)", border: "1px solid rgba(255,210,8,0.22)", borderRadius: 999, padding: "3px 10px" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: dark ? "#FFD208" : "#b45309", letterSpacing: "0.1em" }}>POWERED BY ZAMA FHEVM</span>
+              </div>
             </div>
           </motion.div>
 
