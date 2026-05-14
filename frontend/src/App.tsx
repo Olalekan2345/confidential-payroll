@@ -8,6 +8,7 @@ import {
 import { useFhevm } from "./useFhevm";
 import { TxHistory } from "./TxHistory";
 import { SwapTab } from "./SwapTab";
+import { LandingPage } from "./LandingPage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -536,6 +537,48 @@ export default function App() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  // ── Full-page landing (unauthenticated) ──────────────────────────────────
+  if (!fhevm.address) {
+    return (
+      <>
+        {/* Minimal dark nav on landing */}
+        <header style={{
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(5,5,8,0.85)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        }}>
+          <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FFD208", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+              <span style={{ fontFamily: "'Varela Round', system-ui, sans-serif", fontWeight: 400, fontSize: 16, color: "#f0f0f0", letterSpacing: "-0.2px" }}>ZecurePay</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#FFD208", background: "rgba(255,210,8,0.1)", border: "1px solid rgba(255,210,8,0.2)", borderRadius: 999, padding: "2px 8px", letterSpacing: "0.06em" }}>FHEVM</span>
+            </a>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={toggleDark} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 9px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                {dark ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFD208" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}
+              </button>
+              <button
+                onClick={fhevm.connect}
+                disabled={fhevm.loading}
+                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: fhevm.loading ? "not-allowed" : "pointer", opacity: fhevm.loading ? 0.6 : 1, fontFamily: "'Archivo', system-ui, sans-serif" }}
+              >
+                {fhevm.loading ? "Connecting…" : "Connect Wallet"}
+              </button>
+            </div>
+          </div>
+        </header>
+        <LandingPage onConnect={fhevm.connect} loading={fhevm.loading} error={fhevm.error} />
+      </>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
 
@@ -550,13 +593,19 @@ export default function App() {
       }}>
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* ZecurePay logo mark */}
-            <div style={{ width: 32, height: 32, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(255,210,8,0.4)", flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-            </div>
-            <span style={{ fontFamily: "var(--font-heading)", fontWeight: 400, fontSize: 18, letterSpacing: "-0.3px", color: "var(--text)" }}>ZecurePay</span>
+            {/* ZecurePay logo mark + name — click to return to landing page */}
+            <a
+              href="/"
+              style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", cursor: "pointer" }}
+              title="Go to home"
+            >
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(255,210,8,0.4)", flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+              <span style={{ fontFamily: "var(--font-heading)", fontWeight: 400, fontSize: 18, letterSpacing: "-0.3px", color: "var(--text)" }}>ZecurePay</span>
+            </a>
             <span className="pill-accent">FHEVM</span>
           </div>
           {fhevm.address ? (
@@ -658,59 +707,7 @@ export default function App() {
       <main style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 28px 80px" }}>
 
         {/* ── Main render switch ── */}
-        {!fhevm.address ? (
-          /* Not connected — hero */
-          <div style={{ textAlign: "center", padding: "72px 0 80px" }}>
-            {/* Logo mark */}
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
-              <div style={{ width: 80, height: 80, borderRadius: 22, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 32px rgba(255,210,8,0.35)" }}>
-                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <span className="pill-accent" style={{ marginBottom: 16, display: "inline-flex" }}>Powered by Zama FHEVM</span>
-            </div>
-
-            <h1 style={{ fontSize: 48, marginBottom: 16, lineHeight: 1.15 }}>
-              <span className="gradient-text">ZecurePay</span>
-            </h1>
-            <p style={{ color: "var(--text-2)", maxWidth: 480, margin: "0 auto 16px", lineHeight: 1.8, fontSize: 15 }}>
-              The first fully confidential on-chain payroll. Salary rates are encrypted using
-              homomorphic encryption — no one can see what your employees earn.
-            </p>
-
-            {/* Feature pills */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginBottom: 40 }}>
-              {["🔒 FHE-encrypted salaries", "⛓ Sepolia testnet", "💸 Real ETH transfers", "👁 Only you can decrypt"].map(f => (
-                <span key={f} style={{ fontSize: 12, fontWeight: 500, color: "var(--text-2)", background: "var(--surface)", border: "1.5px solid var(--border)", padding: "5px 14px", borderRadius: 9999, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>{f}</span>
-              ))}
-            </div>
-
-            <button className="btn-primary" onClick={fhevm.connect} disabled={fhevm.loading} style={{ padding: "14px 36px", fontSize: 15, borderRadius: 10 }}>
-              {fhevm.loading ? "Initializing FHE engine…" : "Connect MetaMask to Get Started"}
-            </button>
-            {fhevm.loading && <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted)" }}>Loading WASM cryptography modules — takes ~10 s on first visit</p>}
-            {fhevm.error && <p style={{ color: "var(--danger)", marginTop: 12, fontSize: 13 }}>{fhevm.error}</p>}
-
-            {/* How it works strip */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, maxWidth: 700, margin: "56px auto 0", textAlign: "left" }}>
-              {[
-                { icon: "🏗", title: "Deploy", body: "Employer deploys a private payroll contract owned by their wallet." },
-                { icon: "🔐", title: "Add & Encrypt", body: "Add employees with salaries encrypted client-side before hitting the chain." },
-                { icon: "💰", title: "Pay", body: "ETH is transferred directly. Only the employee can reveal their own salary rate." },
-              ].map(s => (
-                <div key={s.title} className="card" style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 28, marginBottom: 12 }}>{s.icon}</div>
-                  <div style={{ fontFamily: "var(--font-heading)", fontWeight: 400, fontSize: 15, marginBottom: 6 }}>{s.title}</div>
-                  <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.7 }}>{s.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : setupPhase === "checking" ? (
+        {!fhevm.address ? null : setupPhase === "checking" ? (
           /* Checking factory */
           <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)", fontSize: 13 }}>
             Checking your account…
