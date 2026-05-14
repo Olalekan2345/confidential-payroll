@@ -539,44 +539,7 @@ export default function App() {
 
   // ── Full-page landing (unauthenticated) ──────────────────────────────────
   if (!fhevm.address) {
-    return (
-      <>
-        {/* Minimal dark nav on landing */}
-        <header style={{
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(5,5,8,0.85)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        }}>
-          <div style={{ maxWidth: 1040, margin: "0 auto", padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-              <div style={{ width: 30, height: 30, borderRadius: 8, background: "#FFD208", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </div>
-              <span style={{ fontFamily: "'Varela Round', system-ui, sans-serif", fontWeight: 400, fontSize: 16, color: "#f0f0f0", letterSpacing: "-0.2px" }}>ZecurePay</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#FFD208", background: "rgba(255,210,8,0.1)", border: "1px solid rgba(255,210,8,0.2)", borderRadius: 999, padding: "2px 8px", letterSpacing: "0.06em" }}>FHEVM</span>
-            </a>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button onClick={toggleDark} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 9px", cursor: "pointer", display: "flex", alignItems: "center" }}>
-                {dark ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFD208" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>}
-              </button>
-              <button
-                onClick={fhevm.connect}
-                disabled={fhevm.loading}
-                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: fhevm.loading ? "not-allowed" : "pointer", opacity: fhevm.loading ? 0.6 : 1, fontFamily: "'Archivo', system-ui, sans-serif" }}
-              >
-                {fhevm.loading ? "Connecting…" : "Connect Wallet"}
-              </button>
-            </div>
-          </div>
-        </header>
-        <LandingPage onConnect={fhevm.connect} loading={fhevm.loading} error={fhevm.error} />
-      </>
-    );
+    return <LandingPage onConnect={fhevm.connect} loading={fhevm.loading} error={fhevm.error} dark={dark} toggleDark={toggleDark} />;
   }
 
   return (
