@@ -4,36 +4,42 @@ import { motion, useInView, AnimatePresence } from "framer-motion";
 const ease = [0.16, 1, 0.3, 1] as const;
 
 // ─── Theme tokens ──────────────────────────────────────────────────────────────
+// Accent palette: yellow (#FFD208) → amber (#d97706) → charcoal — no purple.
 function t(dark: boolean) {
   return {
-    bg:          dark ? "#050508"                : "#f5f5ff",
-    bgSection:   dark ? "rgba(255,255,255,0.01)" : "rgba(99,102,241,0.02)",
-    text:        dark ? "#f0f0f0"                : "#0f0f1a",
-    textBody:    dark ? "#9ca3af"                : "#4b5563",
-    textMuted:   dark ? "#6b7280"                : "#9ca3af",
-    cardBg:      dark ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.8)",
-    cardBorder:  dark ? "rgba(255,255,255,0.07)" : "rgba(99,102,241,0.12)",
-    cardHoverBg: (c: string) => dark ? `${c}08`  : `${c}0a`,
-    terminalBg:  dark ? "rgba(0,0,0,0.5)"        : "rgba(240,240,255,0.9)",
-    terminalBorder: dark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.2)",
-    chipBg:      dark ? "rgba(99,102,241,0.1)"   : "rgba(99,102,241,0.07)",
-    chipBorder:  dark ? "rgba(99,102,241,0.25)"  : "rgba(99,102,241,0.18)",
-    chipText:    dark ? "#818cf8"                : "#4f46e5",
-    divider:     dark ? "rgba(255,255,255,0.05)" : "rgba(99,102,241,0.1)",
-    navBg:       dark ? "rgba(5,5,8,0.88)"       : "rgba(248,248,255,0.88)",
-    navBorder:   dark ? "rgba(255,255,255,0.06)" : "rgba(99,102,241,0.1)",
-    secLabelBg:  dark ? "rgba(99,102,241,0.1)"   : "rgba(99,102,241,0.07)",
-    orbBlue:     dark ? "rgba(99,102,241,0.18)"  : "rgba(99,102,241,0.10)",
-    orbViolet:   dark ? "rgba(139,92,246,0.16)"  : "rgba(139,92,246,0.09)",
-    orbYellow:   dark ? "rgba(255,210,8,0.08)"   : "rgba(255,210,8,0.10)",
-    gridOpacity: dark ? 0.07                     : 0.06,
-    encCardBg:   dark ? "rgba(15,15,25,0.75)"    : "rgba(255,255,255,0.85)",
-    encCardBorder: dark ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.2)",
-    encCardText: dark ? "#f0f0f0"                : "#1f2937",
-    cipherText:  dark ? "#4b5563"                : "#6b7280",
-    footerText:  dark ? "#4b5563"                : "#9ca3af",
-    footerName:  dark ? "#d1d5db"                : "#374151",
-    scrollArrow: dark ? "#6b7280"                : "#9ca3af",
+    bg:             dark ? "#080808"                  : "#fafaf7",
+    bgSection:      dark ? "rgba(255,255,255,0.01)"   : "rgba(255,210,8,0.03)",
+    text:           dark ? "#f0f0f0"                  : "#0f0f0a",
+    textBody:       dark ? "#9ca3af"                  : "#4b5563",
+    textMuted:      dark ? "#6b7280"                  : "#9ca3af",
+    cardBg:         dark ? "rgba(255,255,255,0.02)"   : "rgba(255,255,255,0.85)",
+    cardBorder:     dark ? "rgba(255,255,255,0.08)"   : "rgba(0,0,0,0.08)",
+    cardHoverBg:    (_c: string) => dark ? "rgba(255,210,8,0.04)" : "rgba(255,210,8,0.05)",
+    terminalBg:     dark ? "rgba(0,0,0,0.55)"         : "rgba(255,255,255,0.92)",
+    terminalBorder: dark ? "rgba(255,210,8,0.15)"     : "rgba(0,0,0,0.1)",
+    chipBg:         dark ? "rgba(255,210,8,0.08)"     : "rgba(255,210,8,0.1)",
+    chipBorder:     dark ? "rgba(255,210,8,0.22)"     : "rgba(217,119,6,0.25)",
+    chipText:       dark ? "#FFD208"                  : "#92400e",
+    divider:        dark ? "rgba(255,255,255,0.06)"   : "rgba(0,0,0,0.07)",
+    navBg:          dark ? "rgba(8,8,8,0.88)"         : "rgba(250,250,247,0.9)",
+    navBorder:      dark ? "rgba(255,255,255,0.07)"   : "rgba(0,0,0,0.07)",
+    secLabelBg:     dark ? "rgba(255,210,8,0.07)"     : "rgba(255,210,8,0.1)",
+    orbYellow1:     dark ? "rgba(255,210,8,0.12)"     : "rgba(255,210,8,0.18)",
+    orbYellow2:     dark ? "rgba(217,119,6,0.10)"     : "rgba(217,119,6,0.13)",
+    orbWhite:       dark ? "rgba(255,255,255,0.03)"   : "rgba(255,255,255,0.6)",
+    gridOpacity:    dark ? 0.05                       : 0.04,
+    gridColor:      dark ? "#ffffff"                  : "#000000",
+    encCardBg:      dark ? "rgba(18,18,12,0.80)"      : "rgba(255,255,255,0.9)",
+    encCardBorder:  dark ? "rgba(255,210,8,0.25)"     : "rgba(0,0,0,0.1)",
+    encCardText:    dark ? "#f0f0f0"                  : "#1f2937",
+    cipherText:     dark ? "#525252"                  : "#6b7280",
+    footerText:     dark ? "#4b5563"                  : "#9ca3af",
+    footerName:     dark ? "#d1d5db"                  : "#374151",
+    scrollArrow:    dark ? "#6b7280"                  : "#9ca3af",
+    // step card accent colours — warm monochrome
+    step1: "#FFD208",
+    step2: "#d97706",
+    step3: "#78716c",
   };
 }
 
@@ -58,16 +64,16 @@ function GridBackground({ dark }: { dark: boolean }) {
       <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, opacity: th.gridOpacity }}>
         <defs>
           <pattern id="lp-grid" width="60" height="60" patternUnits="userSpaceOnUse">
-            <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#6366f1" strokeWidth="0.5" />
+            <path d="M 60 0 L 0 0 0 60" fill="none" stroke={th.gridColor} strokeWidth="0.5" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#lp-grid)" />
       </svg>
-      <motion.div style={{ position: "absolute", top: "-20%", left: "-10%", width: 700, height: 700, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbBlue} 0%, transparent 70%)`, filter: "blur(40px)" }}
+      <motion.div style={{ position: "absolute", top: "-20%", left: "-10%", width: 700, height: 700, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbYellow1} 0%, transparent 70%)`, filter: "blur(50px)" }}
         animate={{ x: [0, 40, 0], y: [0, 30, 0] }} transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }} />
-      <motion.div style={{ position: "absolute", top: "10%", right: "-15%", width: 600, height: 600, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbViolet} 0%, transparent 70%)`, filter: "blur(40px)" }}
+      <motion.div style={{ position: "absolute", top: "10%", right: "-15%", width: 600, height: 600, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbYellow2} 0%, transparent 70%)`, filter: "blur(50px)" }}
         animate={{ x: [0, -50, 0], y: [0, 40, 0] }} transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }} />
-      <motion.div style={{ position: "absolute", bottom: "0%", left: "30%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbYellow} 0%, transparent 70%)`, filter: "blur(60px)" }}
+      <motion.div style={{ position: "absolute", bottom: "0%", left: "30%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbWhite} 0%, transparent 70%)`, filter: "blur(60px)" }}
         animate={{ x: [0, 30, 0], y: [0, -20, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} />
     </div>
   );
@@ -98,7 +104,7 @@ function EncryptedCard({ label, value, token, delay, x, y, rotate, dark }: {
         <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>{label}</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: th.encCardText, fontFamily: "monospace", letterSpacing: 3, marginBottom: 8 }}>{value}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(255,210,8,0.12)", color: "#d97706", border: "1px solid rgba(255,210,8,0.3)" }}>
             🔒 ENCRYPTED
           </span>
           <span style={{ fontSize: 10, color: th.textMuted }}>{token}</span>
@@ -113,7 +119,7 @@ function SectionLabel({ text, dark }: { text: string; dark: boolean }) {
   const th = t(dark);
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: th.secLabelBg, border: `1px solid ${th.chipBorder}`, borderRadius: 999, padding: "5px 14px", marginBottom: 20 }}>
-      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366f1" }} />
+      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFD208" }} />
       <span style={{ fontSize: 11, fontWeight: 700, color: th.chipText, letterSpacing: "0.1em", textTransform: "uppercase" }}>{text}</span>
     </div>
   );
@@ -164,7 +170,7 @@ export function LandingPage({ onConnect, loading, error, dark, toggleDark }: {
             </button>
             <button
               onClick={onConnect} disabled={loading}
-              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, fontFamily: "'Archivo', system-ui, sans-serif", transition: "opacity 0.2s" }}
+              style={{ background: "#FFD208", color: "#000", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, fontFamily: "'Archivo', system-ui, sans-serif", transition: "opacity 0.2s" }}
             >
               {loading ? "Connecting…" : "Connect Wallet"}
             </button>
@@ -181,7 +187,7 @@ export function LandingPage({ onConnect, loading, error, dark, toggleDark }: {
         <EncryptedCard label="Total Paid YTD" value="•••••• cUSDC" token="Sepolia" delay={1.8} x="calc(50% + 300px)" y="58%" rotate={2} dark={dark} />
 
         <motion.div
-          style={{ position: "absolute", top: 0, left: "50%", width: 1, height: "45%", background: "linear-gradient(to bottom, transparent, rgba(99,102,241,0.5), transparent)", transformOrigin: "top" }}
+          style={{ position: "absolute", top: 0, left: "50%", width: 1, height: "45%", background: "linear-gradient(to bottom, transparent, rgba(255,210,8,0.5), transparent)", transformOrigin: "top" }}
           animate={{ scaleY: [0, 1, 0], opacity: [0, 0.7, 0] }}
           transition={{ duration: 3, repeat: Infinity, repeatDelay: 5, ease: "easeInOut" }}
         />
@@ -220,7 +226,7 @@ export function LandingPage({ onConnect, loading, error, dark, toggleDark }: {
             Payroll, Fully{" "}
             <AnimatePresence mode="wait">
               <motion.span key={wordIdx} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease }}
-                style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
+                style={{ background: "linear-gradient(135deg, #FFD208, #d97706)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
               >
                 {words[wordIdx]}
               </motion.span>
@@ -237,9 +243,9 @@ export function LandingPage({ onConnect, loading, error, dark, toggleDark }: {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.45, ease }} style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button
               onClick={onConnect} disabled={loading}
-              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, boxShadow: "0 4px 24px rgba(99,102,241,0.35)", transition: "all 0.2s ease", fontFamily: "'Archivo', system-ui, sans-serif" }}
-              onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 32px rgba(99,102,241,0.55)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(99,102,241,0.35)"; }}
+              style={{ background: "#FFD208", color: "#000", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, boxShadow: "0 4px 24px rgba(255,210,8,0.4)", transition: "all 0.2s ease", fontFamily: "'Archivo', system-ui, sans-serif" }}
+              onMouseEnter={e => { if (!loading) { (e.currentTarget as HTMLButtonElement).style.background = "#f5c800"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 32px rgba(255,210,8,0.55)"; } }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#FFD208"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 24px rgba(255,210,8,0.4)"; }}
             >
               {loading ? "Initializing FHE engine…" : "Launch App →"}
             </button>
@@ -276,9 +282,9 @@ export function LandingPage({ onConnect, loading, error, dark, toggleDark }: {
         </FadeUp>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
           {[
-            { step: "01", title: "Encrypt Locally",   color: "#6366f1", body: "The employer encrypts each salary value client-side using Zama FHEVM before it ever touches the blockchain. The raw amount never leaves the browser.", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> },
-            { step: "02", title: "Process Onchain",   color: "#8b5cf6", body: "Zama FHEVM performs all payroll computations on fully encrypted ciphertexts. Salary values are processed confidentially — the contract never sees plaintext.", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
-            { step: "03", title: "Receive Privately", color: "#a78bfa", body: "Employees receive cUSDC or cUSDT directly to their wallet. Only the recipient can decrypt and view their own salary — nothing is visible on Etherscan.", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
+            { step: "01", title: "Encrypt Locally",   color: th.step1, body: "The employer encrypts each salary value client-side using Zama FHEVM before it ever touches the blockchain. The raw amount never leaves the browser.", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={th.step1} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> },
+            { step: "02", title: "Process Onchain",   color: th.step2, body: "Zama FHEVM performs all payroll computations on fully encrypted ciphertexts. Salary values are processed confidentially — the contract never sees plaintext.", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={th.step2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
+            { step: "03", title: "Receive Privately", color: th.step3, body: "Employees receive cUSDC or cUSDT directly to their wallet. Only the recipient can decrypt and view their own salary — nothing is visible on Etherscan.", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={th.step3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
           ].map((s, i) => (
             <FadeUp key={s.step} delay={i * 0.15}>
               <div
@@ -335,7 +341,7 @@ function FHESection({ dark }: { dark: boolean }) {
   ];
   return (
     <section style={{ padding: "100px 28px", position: "relative", overflow: "hidden", background: th.bgSection, borderTop: `1px solid ${th.divider}`, borderBottom: `1px solid ${th.divider}`, transition: "background 0.3s" }}>
-      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 800, height: 800, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbViolet} 0%, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 800, height: 800, borderRadius: "50%", background: `radial-gradient(circle, ${th.orbYellow2} 0%, transparent 70%)`, pointerEvents: "none" }} />
       <div style={{ maxWidth: 1040, margin: "0 auto", position: "relative" }}>
         <FadeUp>
           <SectionLabel text="Zama FHEVM" dark={dark} />
@@ -350,9 +356,9 @@ function FHESection({ dark }: { dark: boolean }) {
           {features.map((f, i) => (
             <FadeUp key={f.label} delay={i * 0.1}>
               <div
-                style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 16, padding: "24px 22px", transition: "border-color 0.25s, background 0.25s, transform 0.25s, box-shadow 0.25s", boxShadow: dark ? "none" : "0 2px 10px rgba(139,92,246,0.05)" }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "rgba(139,92,246,0.3)"; el.style.background = th.cardHoverBg("#8b5cf6"); el.style.transform = "translateY(-3px)"; el.style.boxShadow = "0 8px 24px rgba(139,92,246,0.12)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = th.cardBorder; el.style.background = th.cardBg; el.style.transform = "translateY(0)"; el.style.boxShadow = dark ? "none" : "0 2px 10px rgba(139,92,246,0.05)"; }}
+                style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 16, padding: "24px 22px", transition: "border-color 0.25s, background 0.25s, transform 0.25s, box-shadow 0.25s", boxShadow: dark ? "none" : "0 2px 10px rgba(0,0,0,0.05)" }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "rgba(255,210,8,0.4)"; el.style.background = th.cardHoverBg("#FFD208"); el.style.transform = "translateY(-3px)"; el.style.boxShadow = "0 8px 24px rgba(255,210,8,0.15)"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = th.cardBorder; el.style.background = th.cardBg; el.style.transform = "translateY(0)"; el.style.boxShadow = dark ? "none" : "0 2px 10px rgba(0,0,0,0.05)"; }}
               >
                 <div style={{ fontSize: 26, marginBottom: 14 }}>{f.icon}</div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 8, fontFamily: "'Varela Round', system-ui, sans-serif" }}>{f.label}</div>
@@ -375,7 +381,7 @@ function CipherVisual({ dark }: { dark: boolean }) {
   const chunks = ["0x4f2a", "c831", "7d9e", "a042", "1fc8", "b30d", "e6f1", "9a75"];
   const rotated = [...chunks.slice(tick % chunks.length), ...chunks.slice(0, tick % chunks.length)];
   return (
-    <div style={{ marginTop: 56, background: th.terminalBg, border: `1px solid ${th.terminalBorder}`, borderRadius: 20, padding: "28px 32px", fontFamily: "'SF Mono','Fira Code',Consolas,monospace", overflow: "hidden", transition: "background 0.3s", boxShadow: dark ? "none" : "0 4px 20px rgba(99,102,241,0.08)" }}>
+    <div style={{ marginTop: 56, background: th.terminalBg, border: `1px solid ${th.terminalBorder}`, borderRadius: 20, padding: "28px 32px", fontFamily: "'SF Mono','Fira Code',Consolas,monospace", overflow: "hidden", transition: "background 0.3s", boxShadow: dark ? "none" : "0 4px 20px rgba(0,0,0,0.07)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
@@ -386,14 +392,14 @@ function CipherVisual({ dark }: { dark: boolean }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {rotated.map((chunk, i) => (
           <motion.span key={`${chunk}-${i}`} initial={{ opacity: 0.4 }} animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, delay: i * 0.06, repeat: Infinity }}
-            style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "rgba(99,102,241,0.1)", color: i === 0 ? "#818cf8" : th.cipherText, border: `1px solid ${i === 0 ? "rgba(99,102,241,0.3)" : "transparent"}` }}
+            style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "rgba(255,210,8,0.07)", color: i === 0 ? "#d97706" : th.cipherText, border: `1px solid ${i === 0 ? "rgba(255,210,8,0.3)" : "transparent"}` }}
           >{chunk}</motion.span>
         ))}
         <span style={{ fontSize: 11, color: th.cipherText }}>... [8192 bytes]</span>
       </div>
       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8 }}>
-        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} style={{ width: 8, height: 8, borderRadius: "50%", background: "#6366f1" }} />
-        <span style={{ fontSize: 11, color: "#6366f1" }}>FHE operations running on ciphertext</span>
+        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} style={{ width: 8, height: 8, borderRadius: "50%", background: "#FFD208" }} />
+        <span style={{ fontSize: 11, color: "#d97706" }}>FHE operations running on ciphertext</span>
       </div>
     </div>
   );
@@ -424,9 +430,9 @@ function PrivacySection({ dark }: { dark: boolean }) {
           {items.map((item, i) => (
             <FadeUp key={item.title} delay={i * 0.1}>
               <div
-                style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 18, padding: "28px 24px", transition: "all 0.25s ease", boxShadow: dark ? "none" : "0 2px 12px rgba(99,102,241,0.05)" }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "rgba(99,102,241,0.3)"; el.style.background = th.cardHoverBg("#6366f1"); el.style.transform = "translateY(-4px)"; el.style.boxShadow = "0 8px 24px rgba(99,102,241,0.12)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = th.cardBorder; el.style.background = th.cardBg; el.style.transform = "translateY(0)"; el.style.boxShadow = dark ? "none" : "0 2px 12px rgba(99,102,241,0.05)"; }}
+                style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 18, padding: "28px 24px", transition: "all 0.25s ease", boxShadow: dark ? "none" : "0 2px 12px rgba(0,0,0,0.05)" }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "rgba(255,210,8,0.4)"; el.style.background = th.cardHoverBg("#FFD208"); el.style.transform = "translateY(-4px)"; el.style.boxShadow = "0 8px 24px rgba(255,210,8,0.15)"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = th.cardBorder; el.style.background = th.cardBg; el.style.transform = "translateY(0)"; el.style.boxShadow = dark ? "none" : "0 2px 12px rgba(0,0,0,0.05)"; }}
               >
                 <div style={{ fontSize: 28, marginBottom: 16 }}>{item.icon}</div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: th.text, marginBottom: 10, fontFamily: "'Varela Round', system-ui, sans-serif" }}>{item.title}</div>
@@ -445,20 +451,20 @@ function FinalCTA({ onConnect, loading, dark }: { onConnect: () => void; loading
   const th = t(dark);
   return (
     <section style={{ padding: "120px 28px", position: "relative", overflow: "hidden", background: th.bgSection, borderTop: `1px solid ${th.divider}`, transition: "background 0.3s" }}>
-      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 700, height: 400, borderRadius: "50%", background: `radial-gradient(ellipse, ${th.orbBlue} 0%, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 700, height: 400, borderRadius: "50%", background: `radial-gradient(ellipse, ${th.orbYellow1} 0%, transparent 70%)`, pointerEvents: "none" }} />
       <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, opacity: th.gridOpacity * 0.6, pointerEvents: "none" }}>
-        <defs><pattern id="lp-grid2" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke="#6366f1" strokeWidth="0.5" /></pattern></defs>
+        <defs><pattern id="lp-grid2" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke={th.gridColor} strokeWidth="0.5" /></pattern></defs>
         <rect width="100%" height="100%" fill="url(#lp-grid2)" />
       </svg>
       <div style={{ maxWidth: 700, margin: "0 auto", textAlign: "center", position: "relative" }}>
         <FadeUp>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: th.secLabelBg, border: `1px solid ${th.chipBorder}`, borderRadius: 999, padding: "5px 16px", marginBottom: 24 }}>
-            <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366f1" }} />
+            <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFD208" }} />
             <span style={{ fontSize: 11, fontWeight: 700, color: th.chipText, letterSpacing: "0.1em" }}>LIVE ON SEPOLIA TESTNET</span>
           </div>
           <h2 style={{ fontSize: "clamp(32px, 5vw, 56px)", fontFamily: "'Varela Round', system-ui, sans-serif", fontWeight: 400, color: th.text, lineHeight: 1.15, letterSpacing: "-0.5px", marginBottom: 20 }}>
             Modern payroll should be<br />
-            <span style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+            <span style={{ background: "linear-gradient(135deg, #FFD208, #d97706)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
               private by default.
             </span>
           </h2>
@@ -468,7 +474,7 @@ function FinalCTA({ onConnect, loading, dark }: { onConnect: () => void; loading
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button
               onClick={onConnect} disabled={loading}
-              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", border: "none", borderRadius: 12, padding: "16px 40px", fontSize: 16, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, boxShadow: "0 4px 32px rgba(99,102,241,0.4)", transition: "all 0.2s ease", fontFamily: "'Archivo', system-ui, sans-serif" }}
+              style={{ background: "#FFD208", color: "#000", border: "none", borderRadius: 12, padding: "16px 40px", fontSize: 16, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1, boxShadow: "0 4px 32px rgba(255,210,8,0.4)", transition: "all 0.2s ease", fontFamily: "'Archivo', system-ui, sans-serif" }}
               onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.04)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
             >
